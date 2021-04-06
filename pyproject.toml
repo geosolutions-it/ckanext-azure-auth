@@ -1,0 +1,68 @@
+[tool.towncrier]
+directory = "changes"
+package = "ckan"
+filename = "CHANGELOG.rst"
+title_format = "v.{version} {project_date}"
+issue_format = "`#{issue} <https://github.com/ckan/ckan/pull/{issue}>`_"
+wrap = true
+
+[[tool.towncrier.type]]
+directory = 'migration'
+name = 'Migration notes'
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = 'feature'
+name = 'Major features'
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = 'misc'
+name = 'Minor changes'
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = 'bugfix'
+name = 'Bugfixes'
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = 'removal'
+name = 'Removals and deprecations'
+showcontent = true
+
+[tool.isort]
+sections = ['FUTURE', 'STDLIB', 'THIRDPARTY', 'FIRSTPARTY', 'LOCALFOLDER']
+no_lines_before = ['LOCALFOLDER']
+multi_line_output = 3
+line_length = 79
+known_first_party = ['ckan', 'ckanext']
+known_third_party = ["cryptography", "flask", "jwt", "lxml", "mock", "requests", "setuptools", "urllib3"]
+include_trailing_comma = true
+skip = ['.venv']
+
+[tool.black]
+line_length = 79
+target_version = ['py38']
+language_version = 'python3.8'
+include = '\.pyi?$'
+exclude = ''' # # these folders wont be formatted by black
+(
+  /(
+     \.git          # root of the project
+    | \.__pycache__
+    | \.mypy_cache
+    | \.pytest_cache
+    | \.tox
+    | \.venv
+    | venv
+    | ckan
+  )/
+  | foo.py           # also separately exclude a file named foo.py in
+                     # the root of the project
+)
+'''
+
+[tool.autopep8]
+max_line_length = 79
+ignore = "E501,W6"

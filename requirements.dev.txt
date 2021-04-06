@@ -1,0 +1,4 @@
+-r requirements.txt
+
+pre-commit==2.10.1
+mock==4.0.3
