@@ -7,12 +7,17 @@ import logging
 import requests
 
 import ckan.plugins.toolkit as toolkit
-from ckan.common import request, session
+from ckan.common import _, request, session
 from ckan.lib import base, helpers
 from ckan.model import State
 from ckanext.azure_auth.auth_backend import AdfsAuthBackend
 from ckanext.azure_auth.auth_config import ADFS_SESSION_PRREFIX, ProviderConfig
-from ckanext.azure_auth.exceptions import CreateUserException, MFARequiredException
+from ckanext.azure_auth.exceptions import (
+    AzureReloginRequiredException,
+    CreateUserException,
+    MFARequiredException,
+    RuntimeIssueException,
+)
 
 log = logging.getLogger(__name__)
 requests.packages.urllib3.add_stderr_logger()
@@ -36,6 +41,9 @@ def login_callback():
             )
         )
     except CreateUserException as e:
+        log.debug(str(e))
+        base.abort(403, str(e))
+    except (AzureReloginRequiredException, RuntimeIssueException) as e:
         log.debug(str(e))
         base.abort(403, str(e))
     except Exception as e:

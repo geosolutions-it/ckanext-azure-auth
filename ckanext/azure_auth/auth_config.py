@@ -13,7 +13,7 @@ from urllib3.util.retry import Retry
 from ckan.common import config
 from ckanext.azure_auth.exceptions import ConfigLoadErrorException
 
-AZURE_AD_SERVER_URL = 'login.microsoftonline.com'
+AZURE_AD_SERVER_URL = 'https://login.microsoftonline.com'
 ADFS_SESSION_PRREFIX = 'adfs-'
 
 # Config keys

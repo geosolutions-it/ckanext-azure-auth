@@ -47,27 +47,27 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
         '''
         toolkit.add_template_directory(config, 'templates')
 
-        if not hasattr(config, ATTR_METADATA_URL):
+        if not ATTR_METADATA_URL in config:
             config[ATTR_METADATA_URL] = 'https://login.microsoftonline.com/'
 
-        if not hasattr(config, ATTR_AUTH_CALLBACK_PATH):
+        if not ATTR_AUTH_CALLBACK_PATH in config:
             config[ATTR_AUTH_CALLBACK_PATH] = '/azure/signin'
 
         # TODO: Not needed
-        if not hasattr(config, ATTR_REDIRECT_URL):
+        if not ATTR_REDIRECT_URL in config:
             config[ATTR_REDIRECT_URL] = (
                 config['ckan.site_url'] + config[ATTR_AUTH_CALLBACK_PATH]
             )
 
-        if not hasattr(config, ATTR_FORCE_MFA):
+        if not ATTR_FORCE_MFA in config:
             config[ATTR_FORCE_MFA] = False
 
-        if not hasattr(config, ATTR_DISABLE_SSO):
+        if not ATTR_DISABLE_SSO in config:
             config[ATTR_DISABLE_SSO] = False
 
-        if hasattr(config, ATTR_TENANT_ID):
+        if ATTR_TENANT_ID in config:
             # If a tenant ID was set, switch to Azure AD mode
-            if hasattr(config, ATTR_AD_SERVER):
+            if ATTR_AD_SERVER in config:
                 msg = 'The SERVER cannot be set when TENANT_ID is set.'
                 raise CkanConfigurationException(msg)
             config[ATTR_AD_SERVER] = AZURE_AD_SERVER_URL
@@ -156,7 +156,7 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
         '''
         Called at logout.
         '''
-        if hasattr(session, f'{ADFS_SESSION_PRREFIX}tokens'):
+        if f'{ADFS_SESSION_PRREFIX}tokens' in session:
             del session[f'{ADFS_SESSION_PRREFIX}tokens']
 
         keys_to_delete = [

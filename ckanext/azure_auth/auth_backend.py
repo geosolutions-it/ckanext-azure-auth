@@ -3,7 +3,7 @@ import uuid
 
 import jwt
 
-from ckan.common import config, session
+from ckan.common import _, config, session
 from ckan.logic import NotFound
 from ckan.plugins import toolkit
 from ckanext.azure_auth.auth_config import (
@@ -17,6 +17,7 @@ from ckanext.azure_auth.auth_config import (
     ProviderConfig,
 )
 from ckanext.azure_auth.exceptions import (
+    AzureReloginRequiredException,
     CreateUserException,
     MFARequiredException,
     RuntimeIssueException,
@@ -54,6 +55,14 @@ class AdfsAuthBackend(object):
             error_description = response.json().get('error_description', '')
             if error_description.startswith('AADSTS50076'):
                 raise MFARequiredException
+
+            # AADSTS54005 - expired  (TODO: an issue)
+            # AADSTS70008 - already provided. Needs relogin
+            if error_description.startswith('AADSTS54005') or \
+                error_description.startswith('AADSTS70008'):
+                raise AzureReloginRequiredException(
+                    _('Please re-sign in at the Microsoft Azure side')
+                )
             log.error(f'ADFS server returned an error: {error_description}')
             raise RuntimeIssueException(error_description)
 

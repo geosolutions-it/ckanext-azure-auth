@@ -16,3 +16,7 @@ class RuntimeIssueException(Exception):
 
 class CreateUserException(Exception):
     pass
+
+
+class AzureReloginRequiredException(Exception):
+    pass

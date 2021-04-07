@@ -19,7 +19,7 @@ setup(
     install_requires=[
         # -*- Extra requirements: -*-
         'xml_python',
-        'jwt',
+        'pyjwt',
         'm2crypto',
     ],
     entry_points="""
