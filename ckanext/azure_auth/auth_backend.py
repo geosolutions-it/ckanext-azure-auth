@@ -13,6 +13,7 @@ from ckanext.azure_auth.auth_config import (
     ATTR_CLIENT_ID,
     ATTR_CLIENT_SECRET,
     ATTR_REDIRECT_URL,
+    AUTH_SERVICE,
     TIMEOUT,
     ProviderConfig,
 )
@@ -59,9 +60,9 @@ class AdfsAuthBackend(object):
             # AADSTS54005 - expired  (TODO: an issue)
             # AADSTS70008 - already provided. Needs relogin
             if error_description.startswith('AADSTS54005') or \
-                error_description.startswith('AADSTS70008'):
+                    error_description.startswith('AADSTS70008'):
                 raise AzureReloginRequiredException(
-                    _('Please re-sign in at the Microsoft Azure side')
+                    _('Please re-sign in on the Microsoft Azure side')
                 )
             log.error(f'ADFS server returned an error: {error_description}')
             raise RuntimeIssueException(error_description)
@@ -142,31 +143,32 @@ class AdfsAuthBackend(object):
         Returns:
             django.contrib.auth.models.User: A Django user
         '''
-        # Create the user
-
-        email = claims['unique_name']
-
-        # uuid or obfuscated email. selected 2nd
-        username = email.lower().replace('@', '_').replace('.', '-')
-
-        if not email:
+        user_id = claims.get("oid")
+        if not user_id:
             log.error(
                 "User claim's doesn't have the claim '%s' in his claims: %s"
-                % ('aim', claims)
+                % ('oid', claims)
             )
             raise PermissionError
 
+        email = claims.get('unique_name')
+        ckan_id = f'{AUTH_SERVICE}-{user_id}'
+
         try:
-            user = toolkit.get_action('user_show')(data_dict={'id': username})
+            user = toolkit.get_action('user_show')(data_dict={'id': ckan_id})
         except NotFound:
             if config[ADFS_CREATE_USER]:
                 user = toolkit.get_action('user_create')(
                     context={'ignore_auth': True},
                     data_dict={
-                        'name': username,
+                        'id': ckan_id,
+                        'name': ckan_id,
                         'fullname': claims['name'],
                         'password': str(uuid.uuid4()),
                         'email': email,
+                        'plugin_extras': {
+                            'azure_auth':  user_id,
+                        }
                     },
                 )
                 log.debug(f"User with email '{email}' has been created.")
@@ -192,7 +194,7 @@ class AdfsAuthBackend(object):
 
         # If there's no token or code, we pass control to the next
         # authentication backend
-        if authorization_code is None or authorization_code == '':
+        if not bool(authorization_code):
             log.debug('No authorization code was received')
             return
 
@@ -213,7 +215,7 @@ class AdfsAuthBackend(object):
 
         # If there's no token or code, we pass control to the next
         # authentication backend
-        if access_token is None or access_token == '':
+        if not bool(access_token):
             log.debug('No authorization code was received')
             return
 

@@ -7,7 +7,7 @@ import logging
 import requests
 
 import ckan.plugins.toolkit as toolkit
-from ckan.common import _, request, session
+from ckan.common import _, g, request, session
 from ckan.lib import base, helpers
 from ckan.model import State
 from ckanext.azure_auth.auth_backend import AdfsAuthBackend
@@ -52,8 +52,7 @@ def login_callback():
 
     if user:
         if user['state'] == State.ACTIVE:
-            # toolkit.c.user = user
-            toolkit.c.user = user['name']
+            g.user = user['name']
             session[f'{ADFS_SESSION_PRREFIX}user'] = user['name']
             session.save()
 

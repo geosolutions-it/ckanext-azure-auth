@@ -5,7 +5,7 @@ from flask import Blueprint
 
 import ckan.plugins as plugins
 import ckan.plugins.toolkit as toolkit
-from ckan.common import _, config, session
+from ckan.common import _, config, g, session
 from ckan.exceptions import CkanConfigurationException
 from ckanext.azure_auth import controllers
 from ckanext.azure_auth.auth_config import (
@@ -47,24 +47,6 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
         '''
         toolkit.add_template_directory(config, 'templates')
 
-        if not ATTR_METADATA_URL in config:
-            config[ATTR_METADATA_URL] = 'https://login.microsoftonline.com/'
-
-        if not ATTR_AUTH_CALLBACK_PATH in config:
-            config[ATTR_AUTH_CALLBACK_PATH] = '/azure/signin'
-
-        # TODO: Not needed
-        if not ATTR_REDIRECT_URL in config:
-            config[ATTR_REDIRECT_URL] = (
-                config['ckan.site_url'] + config[ATTR_AUTH_CALLBACK_PATH]
-            )
-
-        if not ATTR_FORCE_MFA in config:
-            config[ATTR_FORCE_MFA] = False
-
-        if not ATTR_DISABLE_SSO in config:
-            config[ATTR_DISABLE_SSO] = False
-
         if ATTR_TENANT_ID in config:
             # If a tenant ID was set, switch to Azure AD mode
             if ATTR_AD_SERVER in config:
@@ -82,10 +64,23 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
             # tenant ID.
             config[ATTR_TENANT_ID] = 'adfs'
 
-        config['ckanext.azure_auth.config_reload_interval'] = 24  # hours
-        config['ckanext.azure_auth.ca_bundle'] = True
-        config['ckanext.azure_auth.retry'] = 5
-        config['ckanext.azure_auth.jwt_leeway'] = 0
+        # Set plugin defaults
+        azure_auth_plugin_defaults = (
+            (ATTR_METADATA_URL, 'https://login.microsoftonline.com/'),
+            (ATTR_AUTH_CALLBACK_PATH, '/oauth2/callback'),
+            (
+                ATTR_REDIRECT_URL, config['ckan.site_url'] +
+                config[ATTR_AUTH_CALLBACK_PATH]
+            ),
+            (ATTR_FORCE_MFA, False),
+            (ATTR_DISABLE_SSO, False),
+            ('ckanext.azure_auth.config_reload_interval', 24),  # in hours
+            ('ckanext.azure_auth.ca_bundle', True),
+            ('ckanext.azure_auth.retry', 5),
+            ('ckanext.azure_auth.jwt_leeway', 0),
+        )
+        for k, d in azure_auth_plugin_defaults:
+            config.setdefault(k, d)
 
     def update_config_schema(self, schema):
         not_empty = toolkit.get_validator('not_empty')
@@ -144,7 +139,7 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
         '''
         user = session.get(f'{ADFS_SESSION_PRREFIX}user')
         if user:
-            toolkit.c.user = user
+            g.user = user
 
     def login(self):
         '''

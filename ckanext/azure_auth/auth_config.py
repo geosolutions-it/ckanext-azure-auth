@@ -10,10 +10,12 @@ from cryptography.hazmat.backends.openssl.backend import backend
 from cryptography.x509 import load_der_x509_certificate
 from urllib3.util.retry import Retry
 
-from ckan.common import config
+from ckan.common import asbool, config
 from ckanext.azure_auth.exceptions import ConfigLoadErrorException
 
 AZURE_AD_SERVER_URL = 'https://login.microsoftonline.com'
+
+AUTH_SERVICE = 'adfs'
 ADFS_SESSION_PRREFIX = 'adfs-'
 
 # Config keys
@@ -228,11 +230,12 @@ class ProviderConfig(object):
                 'state': redirect_to,
             }
         )
+
         if self._mode == 'openid_connect':
             query['scope'] = 'openid'
-            if config[ATTR_DISABLE_SSO]:
+            if asbool(config[ATTR_DISABLE_SSO]):
                 query['prompt'] = 'login'
-            if config[ATTR_FORCE_MFA]:
+            if asbool(config[ATTR_FORCE_MFA]):
                 query['amr_values'] = 'ngcmfa'
         return '{0}?{1}'.format(self.authorization_endpoint, urlencode(query))
 
