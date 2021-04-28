@@ -8,8 +8,8 @@ from ckan.logic import NotFound
 from ckan.plugins import toolkit
 from ckanext.azure_auth.auth_config import (
     ADFS_CREATE_USER,
-    ADFS_SESSION_PRREFIX,
-    ADSF_AUDIENCE,
+    ADFS_SESSION_PREFIX,
+    ATTR_ADSF_AUDIENCE,
     ATTR_CLIENT_ID,
     ATTR_CLIENT_SECRET,
     ATTR_REDIRECT_URL,
@@ -74,7 +74,7 @@ class AdfsAuthBackend(object):
             raise PermissionError
 
         adfs_response = response.json()
-        session[f'{ADFS_SESSION_PRREFIX}tokens'] = adfs_response
+        session[f'{ADFS_SESSION_PREFIX}tokens'] = adfs_response
         session.save()
         return adfs_response
 
@@ -101,7 +101,7 @@ class AdfsAuthBackend(object):
                     access_token,
                     key=key,
                     algorithms=['RS256', 'RS384', 'RS512'],
-                    audience=config[ADSF_AUDIENCE],
+                    audience=config[ATTR_ADSF_AUDIENCE],
                     issuer=self.provider_config.issuer,
                     options=options,
                     leeway=config['ckanext.azure_auth.jwt_leeway'],

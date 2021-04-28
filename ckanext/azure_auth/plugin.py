@@ -10,8 +10,8 @@ from ckan.exceptions import CkanConfigurationException
 from ckanext.azure_auth import controllers
 from ckanext.azure_auth.auth_config import (
     ADFS_CREATE_USER,
-    ADFS_SESSION_PRREFIX,
-    ADSF_AUDIENCE,
+    ADFS_SESSION_PREFIX,
+    ATTR_ADSF_AUDIENCE,
     ATTR_AD_SERVER,
     ATTR_AUTH_CALLBACK_PATH,
     ATTR_CLIENT_ID,
@@ -50,28 +50,24 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
         if ATTR_TENANT_ID in config:
             # If a tenant ID was set, switch to Azure AD mode
             if ATTR_AD_SERVER in config:
-                msg = 'The SERVER cannot be set when TENANT_ID is set.'
+                msg = f'The {ATTR_AD_SERVER} should not be set when {ATTR_TENANT_ID} is set.'
                 raise CkanConfigurationException(msg)
             config[ATTR_AD_SERVER] = AZURE_AD_SERVER_URL
 
         # Validate required settings
         if not config[ATTR_TENANT_ID] and not config[ATTR_AD_SERVER]:
-            msg = 'Exactly one of the settings TENANT_ID or SERVER must be set'
+            msg = f'Exactly one of the settings {ATTR_TENANT_ID} or {ATTR_AD_SERVER} must be set'
             raise CkanConfigurationException(msg)
         elif config[ATTR_TENANT_ID] is None:
             # For on premises ADFS, the tenant ID is set to adfs
-            # On AzureAD the adfs part in the URL happens to be replace by the
-            # tenant ID.
+            # On AzureAD the adfs part in the URL happens to be replace by the tenant ID.
             config[ATTR_TENANT_ID] = 'adfs'
 
         # Set plugin defaults
         azure_auth_plugin_defaults = (
             (ATTR_METADATA_URL, 'https://login.microsoftonline.com/'),
             (ATTR_AUTH_CALLBACK_PATH, '/oauth2/callback'),
-            (
-                ATTR_REDIRECT_URL, config['ckan.site_url'] +
-                config[ATTR_AUTH_CALLBACK_PATH]
-            ),
+            (ATTR_REDIRECT_URL, config['ckan.site_url'] + config[ATTR_AUTH_CALLBACK_PATH]),
             (ATTR_FORCE_MFA, False),
             (ATTR_DISABLE_SSO, False),
             ('ckanext.azure_auth.config_reload_interval', 24),  # in hours
@@ -101,14 +97,14 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
                 ATTR_DISABLE_SSO: [ignore_missing, boolean_validator],
                 ATTR_AD_SERVER: [ignore_missing, unicode_safe],
                 ADFS_CREATE_USER: [not_empty, boolean_validator],
-                ADSF_AUDIENCE: [not_empty, unicode_safe],
+                ATTR_ADSF_AUDIENCE: [not_empty, unicode_safe],
             }
         )
         return schema
 
     def get_helpers(self):
         def is_adfs_user():
-            return bool(session.get(f'{ADFS_SESSION_PRREFIX}user'))
+            return bool(session.get(f'{ADFS_SESSION_PREFIX}user'))
 
         provider_config = ProviderConfig()
         adfs_authentication_endpoint = (
@@ -137,7 +133,7 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
         '''
         Called to identify the user.
         '''
-        user = session.get(f'{ADFS_SESSION_PRREFIX}user')
+        user = session.get(f'{ADFS_SESSION_PREFIX}user')
         if user:
             g.user = user
 
@@ -151,11 +147,11 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
         '''
         Called at logout.
         '''
-        if f'{ADFS_SESSION_PRREFIX}tokens' in session:
-            del session[f'{ADFS_SESSION_PRREFIX}tokens']
+        if f'{ADFS_SESSION_PREFIX}tokens' in session:
+            del session[f'{ADFS_SESSION_PREFIX}tokens']
 
         keys_to_delete = [
-            key for key in session if key.startswith(ADFS_SESSION_PRREFIX)
+            key for key in session if key.startswith(ADFS_SESSION_PREFIX)
         ]
         if keys_to_delete:
             for key in keys_to_delete:
@@ -167,4 +163,4 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
         Called on abort.  This allows aborts due to authorization issues
         to be overriden.
         '''
-        return (status_code, detail, headers, comment)
+        return status_code, detail, headers, comment

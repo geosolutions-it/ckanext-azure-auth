@@ -1,9 +1,8 @@
 # encoding: utf-8
 
 __version__ = '0.0.1'
-__description__ = 'CKAN Software'
-__long_description__ = \
-'''
+__description__ = 'ADFS Authentication'
+__long_description__ = '''
 '''
 __license__ = 'AGPL'
 

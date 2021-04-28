@@ -13,27 +13,29 @@ from urllib3.util.retry import Retry
 from ckan.common import asbool, config
 from ckanext.azure_auth.exceptions import ConfigLoadErrorException
 
+_EXTNAME = 'ckanext.azure_auth'
+
 AZURE_AD_SERVER_URL = 'https://login.microsoftonline.com'
 
 AUTH_SERVICE = 'adfs'
-ADFS_SESSION_PRREFIX = 'adfs-'
+ADFS_SESSION_PREFIX = 'adfs-'
 
 # Config keys
-ATTR_AD_SERVER = 'ckanext.azure_auth.ad_server'
-ATTR_WT_REALM = 'ckanext.azure_auth.wtrealm'
-ATTR_METADATA_URL = 'ckanext.azure_auth.metadata_url'
-ATTR_HELP_TEXT = 'ckanext.azure_auth.login_help_text'
-ATTR_AUTH_CALLBACK_PATH = 'ckanext.azure_auth.auth_callback_path'
-ATTR_TENANT_ID = 'ckanext.azure_auth.tenant_id'
-ATTR_CLIENT_ID = 'ckanext.azure_auth.client_id'
-ADSF_AUDIENCE = 'ckanext.azure_auth.audience'
-ATTR_CLIENT_SECRET = 'ckanext.azure_auth.client_secret'
-ATTR_FORCE_MFA = 'ckanext.azure_auth.force_mfa'
-ATTR_DISABLE_SSO = 'ckanext.azure_auth.disable_sso'
+ATTR_AD_SERVER = f'{_EXTNAME}.ad_server'
+ATTR_WT_REALM = f'{_EXTNAME}.wtrealm'
+ATTR_METADATA_URL = f'{_EXTNAME}.metadata_url'
+ATTR_HELP_TEXT = f'{_EXTNAME}.login_help_text'
+ATTR_AUTH_CALLBACK_PATH = f'{_EXTNAME}.auth_callback_path'
+ATTR_TENANT_ID = f'{_EXTNAME}.tenant_id'
+ATTR_CLIENT_ID = f'{_EXTNAME}.client_id'
+ATTR_ADSF_AUDIENCE = f'{_EXTNAME}.audience'
+ATTR_CLIENT_SECRET = f'{_EXTNAME}.client_secret'
+ATTR_FORCE_MFA = f'{_EXTNAME}.force_mfa'
+ATTR_DISABLE_SSO = f'{_EXTNAME}.disable_sso'
 
 # Config keys: Configured at runtime
-ATTR_REDIRECT_URL = 'ckanext.azure_auth.redirect_uri'
-ADFS_CREATE_USER = 'ckanext.azure_auth.allow_create_users'
+ATTR_REDIRECT_URL = f'{_EXTNAME}.redirect_uri'
+ADFS_CREATE_USER = f'{_EXTNAME}.allow_create_users'
 
 XML_CERT_SECTIONS = (
     './{urn:oasis:names:tc:SAML:2.0:metadata}RoleDescriptor'
@@ -67,7 +69,7 @@ class ProviderConfig(object):
         method_whitelist = frozenset(
             ['HEAD', 'GET', 'PUT', 'DELETE', 'OPTIONS', 'TRACE', 'POST']
         )
-        retries = config['ckanext.azure_auth.retry']
+        retries = config[f'{_EXTNAME}.retry']
         retry = Retry(
             total=retries,
             read=retries,
@@ -79,18 +81,18 @@ class ProviderConfig(object):
         self.session = requests.Session()
         adapter = requests.adapters.HTTPAdapter(max_retries=retry)
         self.session.mount('https://', adapter)
-        self.session.verify = config['ckanext.azure_auth.ca_bundle']
+        self.session.verify = config[f'{_EXTNAME}.ca_bundle']
 
     def load_config(self):
         # If loaded data is too old, reload it again
         refresh_time = datetime.now() - timedelta(
-            hours=config['ckanext.azure_auth.config_reload_interval']
+            hours=config[f'{_EXTNAME}.config_reload_interval']
         )
         if (
             self._config_timestamp is None
             or self._config_timestamp < refresh_time
         ):
-            log.debug('Loading adfs ID Provider configuration.')
+            log.debug('Loading ADFS ID Provider configuration.')
             try:
                 # skipped
                 # raise ConfigLoadErrorException()
@@ -104,7 +106,7 @@ class ProviderConfig(object):
                 if self._config_timestamp is None:
                     msg = (
                         'Could not load any data from ADFS server. '
-                        'Authentication against ADFS not be possible. '
+                        'Authentication against ADFS is not possible. '
                     )
                     log.critical(msg)
                     raise RuntimeError(msg)

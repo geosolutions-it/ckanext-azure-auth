@@ -1,5 +1,5 @@
 '''
-Plugin for our ADFS
+Plugin for ADFS authentication
 '''
 import base64
 import logging
@@ -11,7 +11,7 @@ from ckan.common import _, g, request, session
 from ckan.lib import base, helpers
 from ckan.model import State
 from ckanext.azure_auth.auth_backend import AdfsAuthBackend
-from ckanext.azure_auth.auth_config import ADFS_SESSION_PRREFIX, ProviderConfig
+from ckanext.azure_auth.auth_config import ADFS_SESSION_PREFIX, ProviderConfig
 from ckanext.azure_auth.exceptions import (
     AzureReloginRequiredException,
     CreateUserException,
@@ -25,7 +25,7 @@ requests.packages.urllib3.add_stderr_logger()
 
 def login_callback():
     '''
-    Handles ADGS callback
+    Handles ADFS callback
     received auth code or auth tokens
     '''
     code = request.params.get('code')
@@ -38,7 +38,7 @@ def login_callback():
         return helpers.redirect_to(
             provider_config.build_authorization_endpoint(
                 request, force_mfa=True
-            )
+            )  # no params needed - FIXME
         )
     except CreateUserException as e:
         log.debug(str(e))
@@ -53,7 +53,7 @@ def login_callback():
     if user:
         if user['state'] == State.ACTIVE:
             g.user = user['name']
-            session[f'{ADFS_SESSION_PRREFIX}user'] = user['name']
+            session[f'{ADFS_SESSION_PREFIX}user'] = user['name']
             session.save()
 
             # Redirect to the "after login" page.
