@@ -1,0 +1,30 @@
+{% ckan_extends %}
+
+{% block primary_content %}
+  <section class="module">
+    <div class="module-content">
+      <h1 class="page-heading">{% block page_heading %}{{ _('Login') }}{% endblock %}</h1>
+
+      <fieldset>
+        <legend>{{ _('Login with Microsoft Active Directory Federated Services (ADFS)') }}</legend>
+        <div class="control-group control-medium">
+          <a href="{{ h.adfs_authentication_endpoint }}" id="adfs-login-link">
+            {{ h.adfs_sign_in_btn}}
+          </a>
+          <p>
+            {{ _('For employees, click the Login button above to Sign in with the company AD account.') }}
+          </p>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>
+          {{ _('Use your {site_title} username and password').format(site_title=g.site_title) }}
+        </legend>
+        {% block form %}
+          {% snippet "user/snippets/login_form.html", action=c.login_handler, error_summary=error_summary %}
+        {% endblock %}
+      </fieldset>
+    </div>
+  </section>
+{% endblock %}
