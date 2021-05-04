@@ -105,14 +105,20 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
     def get_helpers(self):
         def is_adfs_user():
             return bool(session.get(f'{ADFS_SESSION_PREFIX}user'))
-
-        provider_config = ProviderConfig()
-        adfs_authentication_endpoint = (
-            provider_config.build_authorization_endpoint()
-        )
+        try:
+            provider_config = ProviderConfig()
+            adfs_authentication_endpoint_error = ''
+            adfs_authentication_endpoint = (
+                provider_config.build_authorization_endpoint()
+            )
+        except RuntimeError as err:
+            log.critical(err)
+            adfs_authentication_endpoint = False
+            adfs_authentication_endpoint_error = str(err)
         return dict(
             is_adfs_user=is_adfs_user,
             adfs_authentication_endpoint=adfs_authentication_endpoint,
+            adfs_authentication_endpoint_error=adfs_authentication_endpoint_error,
             adfs_sign_in_btn=_('{} Sign In').format(
                 config.get('ckan.site_title')
             ),

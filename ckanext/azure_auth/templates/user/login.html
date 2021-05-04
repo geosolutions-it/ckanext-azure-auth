@@ -8,12 +8,20 @@
       <fieldset>
         <legend>{{ _('Login with Microsoft Active Directory Federated Services (ADFS)') }}</legend>
         <div class="control-group control-medium">
+          {% if h.adfs_authentication_endpoint %}
           <a href="{{ h.adfs_authentication_endpoint }}" id="adfs-login-link">
             {{ h.adfs_sign_in_btn}}
           </a>
           <p>
             {{ _('For employees, click the Login button above to Sign in with the company AD account.') }}
           </p>
+          {% else %}
+            <p>
+              <i class="error">
+                {{h.adfs_authentication_endpoint_error }}
+              </i>
+            </p>
+          {% endif %}
         </div>
       </fieldset>
 
