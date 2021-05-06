@@ -55,10 +55,10 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
             config[ATTR_AD_SERVER] = AZURE_AD_SERVER_URL
 
         # Validate required settings
-        if not config[ATTR_TENANT_ID] and not config[ATTR_AD_SERVER]:
+        if ATTR_TENANT_ID not in config and ATTR_AD_SERVER not in config:
             msg = f'Exactly one of the settings {ATTR_TENANT_ID} or {ATTR_AD_SERVER} must be set'
             raise CkanConfigurationException(msg)
-        elif config[ATTR_TENANT_ID] is None:
+        elif ATTR_TENANT_ID not in config:
             # For on premises ADFS, the tenant ID is set to adfs
             # On AzureAD the adfs part in the URL happens to be replace by the tenant ID.
             config[ATTR_TENANT_ID] = 'adfs'
@@ -105,14 +105,20 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
     def get_helpers(self):
         def is_adfs_user():
             return bool(session.get(f'{ADFS_SESSION_PREFIX}user'))
-
-        provider_config = ProviderConfig()
-        adfs_authentication_endpoint = (
-            provider_config.build_authorization_endpoint()
-        )
+        try:
+            provider_config = ProviderConfig()
+            adfs_authentication_endpoint_error = ''
+            adfs_authentication_endpoint = (
+                provider_config.build_authorization_endpoint()
+            )
+        except RuntimeError as err:
+            log.critical(err)
+            adfs_authentication_endpoint = False
+            adfs_authentication_endpoint_error = str(err)
         return dict(
             is_adfs_user=is_adfs_user,
             adfs_authentication_endpoint=adfs_authentication_endpoint,
+            adfs_authentication_endpoint_error=adfs_authentication_endpoint_error,
             adfs_sign_in_btn=_('{} Sign In').format(
                 config.get('ckan.site_title')
             ),

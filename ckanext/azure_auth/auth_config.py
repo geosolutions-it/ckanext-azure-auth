@@ -93,14 +93,17 @@ class ProviderConfig(object):
             or self._config_timestamp < refresh_time
         ):
             log.debug('Loading ADFS ID Provider configuration.')
+            loaded = False
             try:
                 # skipped
                 # raise ConfigLoadErrorException()
                 loaded = self._load_openid_config()
                 self._mode = 'openid_connect'
+                if not loaded:
+                    loaded = self._load_federation_metadata()
+                    self._mode = 'oauth2'
             except ConfigLoadErrorException:
-                loaded = self._load_federation_metadata()
-                self._mode = 'oauth2'
+                pass
 
             if not loaded:
                 if self._config_timestamp is None:
@@ -153,7 +156,7 @@ class ProviderConfig(object):
             # The PKIX certificate containing the key value MUST be the first
             # certificate
         except requests.HTTPError:
-            raise ConfigLoadErrorException
+            return False
 
         self._load_keys(signing_certificates)
         try:
@@ -165,7 +168,7 @@ class ProviderConfig(object):
             else:
                 self.issuer = openid_cfg['access_token_issuer']
         except KeyError:
-            raise ConfigLoadErrorException
+            return False
         return True
 
     def _load_federation_metadata(self):
@@ -185,7 +188,7 @@ class ProviderConfig(object):
             response = self.session.get(adfs_config_url, timeout=TIMEOUT)
             response.raise_for_status()
         except requests.HTTPError:
-            raise ConfigLoadErrorException
+            return False
 
         # Extract token signing certificates
         xml_tree = ElementTree.fromstring(response.content)
