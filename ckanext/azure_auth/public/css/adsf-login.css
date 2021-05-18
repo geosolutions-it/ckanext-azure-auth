@@ -1,0 +1,17 @@
+.login-block {
+    padding: 15px;
+    background: #f3f3f3;
+    margin-bottom: 10px;
+    border: 1px solid #495057;
+}
+.login-block.adfs .control-group {
+        text-align: center;
+}
+
+
+.btn-microsoft {
+    color: #fff;
+    background-color: #2672ec;
+    border-color: rgba(0,0,0,0.2);
+    margin-bottom: 10px;
+}
