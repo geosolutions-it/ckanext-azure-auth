@@ -46,6 +46,7 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
         Add our templates to CKAN's search path
         '''
         toolkit.add_template_directory(config, 'templates')
+        toolkit.add_public_directory(config, 'public')
 
         if ATTR_TENANT_ID in config:
             # If a tenant ID was set, switch to Azure AD mode

@@ -1,5 +1,10 @@
 {% ckan_extends %}
 
+{% block styles %}
+  {{ super() }}
+  <link rel="stylesheet" href="/css/azure-auth.css" />
+{% endblock %}
+
 {% block primary_content %}
   <section class="module">
     <div class="module-content">
