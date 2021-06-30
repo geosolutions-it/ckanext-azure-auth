@@ -31,6 +31,8 @@
 
 {% if h.is_adfs_user() %}
     <!-- Cannot change password for this account since it's ADFS. -->
+    <input type="hidden" name="password1" value="" />
+    <input type="hidden" name="password2" value="" />
 {% else %}
   <fieldset>
     <legend>{{ _('Change password') }}</legend>
