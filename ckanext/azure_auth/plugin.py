@@ -85,22 +85,22 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
         ignore_missing = toolkit.get_validator('ignore_missing')
         boolean_validator = toolkit.get_validator('boolean_validator')
 
-        schema.update(
-            {
-                ATTR_WT_REALM: [not_empty, unicode_safe],
-                ATTR_METADATA_URL: [not_empty, unicode_safe],
-                ATTR_HELP_TEXT: [ignore_missing, unicode_safe],
-                ATTR_REDIRECT_URL: [not_empty, unicode_safe],
-                ATTR_TENANT_ID: [not_empty, unicode_safe],
-                ATTR_CLIENT_ID: [not_empty, unicode_safe],
-                ATTR_CLIENT_SECRET: [not_empty, unicode_safe],
-                ATTR_FORCE_MFA: [ignore_missing, boolean_validator],
-                ATTR_DISABLE_SSO: [ignore_missing, boolean_validator],
-                ATTR_AD_SERVER: [ignore_missing, unicode_safe],
-                ADFS_CREATE_USER: [not_empty, boolean_validator],
-                ATTR_ADSF_AUDIENCE: [not_empty, unicode_safe],
-            }
-        )
+        # schema.update(
+        #     {
+        #         ATTR_WT_REALM: [not_empty, unicode_safe],
+        #         ATTR_METADATA_URL: [not_empty, unicode_safe],
+        #         ATTR_HELP_TEXT: [ignore_missing, unicode_safe],
+        #         ATTR_REDIRECT_URL: [not_empty, unicode_safe],
+        #         ATTR_TENANT_ID: [not_empty, unicode_safe],
+        #         ATTR_CLIENT_ID: [not_empty, unicode_safe],
+        #         ATTR_CLIENT_SECRET: [not_empty, unicode_safe],
+        #         ATTR_FORCE_MFA: [ignore_missing, boolean_validator],
+        #         ATTR_DISABLE_SSO: [ignore_missing, boolean_validator],
+        #         ATTR_AD_SERVER: [ignore_missing, unicode_safe],
+        #         ADFS_CREATE_USER: [not_empty, boolean_validator],
+        #         ATTR_ADSF_AUDIENCE: [not_empty, unicode_safe],
+        #     }
+        # )
         return schema
 
     def get_helpers(self):
