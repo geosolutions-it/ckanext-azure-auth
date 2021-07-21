@@ -37,6 +37,11 @@ ATTR_DISABLE_SSO = f'{_EXTNAME}.disable_sso'
 ATTR_REDIRECT_URL = f'{_EXTNAME}.redirect_uri'
 ADFS_CREATE_USER = f'{_EXTNAME}.allow_create_users'
 
+ATTR_LOGIN_LABEL = f'{_EXTNAME}.login_label'
+ATTR_LOGIN_BUTTON = f'{_EXTNAME}.login_button'
+
+RENDERABLE_ATTRS = (ATTR_LOGIN_LABEL, ATTR_LOGIN_BUTTON)
+
 XML_CERT_SECTIONS = (
     './{urn:oasis:names:tc:SAML:2.0:metadata}RoleDescriptor'
     "[@{http://www.w3.org/2001/XMLSchema-instance}type='fed:SecurityTokenServiceType']"

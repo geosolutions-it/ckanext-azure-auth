@@ -1,14 +1,14 @@
 import logging
-
 import requests
-from flask import Blueprint
 
+from ckan.logic import get_action, NotAuthorized
+from ckan.common import g, session
+from ckan.exceptions import CkanConfigurationException
 import ckan.plugins as plugins
 import ckan.plugins.toolkit as toolkit
-from ckan.common import _, config, g, session
-from ckan.exceptions import CkanConfigurationException
-from ckanext.azure_auth import controllers
+
 from ckanext.azure_auth.auth_config import (
+    _EXTNAME,
     ADFS_CREATE_USER,
     ADFS_SESSION_PREFIX,
     ATTR_ADSF_AUDIENCE,
@@ -24,8 +24,12 @@ from ckanext.azure_auth.auth_config import (
     ATTR_TENANT_ID,
     ATTR_WT_REALM,
     AZURE_AD_SERVER_URL,
+    ATTR_LOGIN_LABEL, ATTR_LOGIN_BUTTON,
     ProviderConfig,
+    RENDERABLE_ATTRS,
 )
+
+from ckanext.azure_auth.blueprint import azure_auth_blueprint, azure_admin_blueprint
 
 log = logging.getLogger(__name__)
 requests.packages.urllib3.add_stderr_logger()
@@ -47,6 +51,8 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
         '''
         toolkit.add_template_directory(config, 'templates')
         toolkit.add_public_directory(config, 'public')
+
+        toolkit.add_ckan_admin_tab(config, 'azure_admin.azure_auth_config', 'ADFS', icon='windows')
 
         if ATTR_TENANT_ID in config:
             # If a tenant ID was set, switch to Azure AD mode
@@ -80,10 +86,10 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
             config.setdefault(k, d)
 
     def update_config_schema(self, schema):
-        not_empty = toolkit.get_validator('not_empty')
+        # not_empty = toolkit.get_validator('not_empty')
         unicode_safe = toolkit.get_validator('unicode_safe')
         ignore_missing = toolkit.get_validator('ignore_missing')
-        boolean_validator = toolkit.get_validator('boolean_validator')
+        # boolean_validator = toolkit.get_validator('boolean_validator')
 
         # schema.update(
         #     {
@@ -101,11 +107,26 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
         #         ATTR_ADSF_AUDIENCE: [not_empty, unicode_safe],
         #     }
         # )
+
+        schema.update(
+            {
+                ATTR_LOGIN_LABEL: [ignore_missing, unicode_safe],
+                ATTR_LOGIN_BUTTON: [ignore_missing, unicode_safe],
+            }
+        )
+
         return schema
 
     def get_helpers(self):
+
         def is_adfs_user():
             return bool(session.get(f'{ADFS_SESSION_PREFIX}user'))
+
+        def get_attrib(key):
+            if key not in RENDERABLE_ATTRS:
+                raise NotAuthorized('Attribute is not accessible')
+            return get_action('config_option_show')({'ignore_auth': True}, {'key': key})
+
         try:
             provider_config = ProviderConfig()
             adfs_authentication_endpoint_error = ''
@@ -116,44 +137,31 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
             log.critical(err)
             adfs_authentication_endpoint = False
             adfs_authentication_endpoint_error = str(err)
-        return dict(
-            is_adfs_user=is_adfs_user,
-            adfs_authentication_endpoint=adfs_authentication_endpoint,
-            adfs_authentication_endpoint_error=adfs_authentication_endpoint_error,
-            adfs_sign_in_btn=_('{} Sign In').format(
-                config.get('ckan.site_title')
-            ),
-        )
+
+        return {
+            'is_adfs_user': is_adfs_user,
+            'adfs_authentication_endpoint': adfs_authentication_endpoint,
+            'adfs_authentication_endpoint_error': adfs_authentication_endpoint_error,
+            'adfs_get_attrib': get_attrib,
+        }
 
     def get_blueprint(self):
         '''Return a Flask Blueprint object to be registered by the app.'''
-        blueprint = Blueprint(self.name, self.__module__)
-        blueprint.template_folder = 'templates'
-        blueprint.add_url_rule(
-            rule=config[ATTR_AUTH_CALLBACK_PATH],
-            endpoint='login',
-            view_func=controllers.login_callback,
-        )
-        return blueprint
+        return [
+            azure_auth_blueprint,
+            azure_admin_blueprint
+        ]
 
+    # IAuthenticator
     def identify(self):
-        '''
-        Called to identify the user.
-        '''
         user = session.get(f'{ADFS_SESSION_PREFIX}user')
         if user:
             g.user = user
 
     def login(self):
-        '''
-        Called at login.
-        '''
         pass
 
     def logout(self):
-        '''
-        Called at logout.
-        '''
         if f'{ADFS_SESSION_PREFIX}tokens' in session:
             del session[f'{ADFS_SESSION_PREFIX}tokens']
 
@@ -166,8 +174,4 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
             session.save()
 
     def abort(self, status_code, detail, headers, comment):
-        '''
-        Called on abort.  This allows aborts due to authorization issues
-        to be overriden.
-        '''
         return status_code, detail, headers, comment

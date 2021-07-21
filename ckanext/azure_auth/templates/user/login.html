@@ -11,11 +11,12 @@
       <h1 class="page-heading">{% block page_heading %}{{ _('Login') }}{% endblock %}</h1>
       <div class="login-block adfs">
       <fieldset>
-        <legend>{{ _('Login with Microsoft Active Directory Federated Services (ADFS)') }}</legend>
+        <legend>
+          {{ h.adfs_get_attrib('ckanext.azure_auth.login_label') or _('Login with Microsoft Active Directory Federated Services (ADFS)') }}</legend>
         <div class="control-group control-medium">
           {% if h.adfs_authentication_endpoint %}
           <a href="{{ h.adfs_authentication_endpoint }}" id="adfs-login-link" class="btn btn-primary btn-microsoft">
-            <span class="fa fa-windows"></span> {{ h.adfs_sign_in_btn}}
+            <span class="fa fa-windows"></span> {{ h.adfs_get_attrib('ckanext.azure_auth.login_button') or (g.site_title ~ ' ' ~ _('sign in')) }}
           </a>
           <p>
             {{ _('For employees, click the Login button above to Sign in with the company AD account.') }}
