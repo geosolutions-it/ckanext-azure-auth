@@ -1,9 +1,11 @@
 import logging
 import uuid
+import re
 
 import jwt
 
 from ckan.common import _, config, session
+from ckan.lib.munge import substitute_ascii_equivalents
 from ckan.logic import NotFound
 from ckan.plugins import toolkit
 from ckanext.azure_auth.auth_config import (
@@ -107,7 +109,7 @@ class AdfsAuthBackend(object):
                     leeway=config['ckanext.azure_auth.jwt_leeway'],
                 )
             except jwt.ExpiredSignatureError as error:
-                log.info('Signature has expired: {error}')
+                log.info(f'Signature has expired: {error}')
                 raise PermissionError
             except jwt.DecodeError as error:
                 # If it's not the last certificate in the list, skip to the
@@ -130,10 +132,10 @@ class AdfsAuthBackend(object):
         if not claims:
             raise PermissionError
 
-        user = self.create_user(claims)
-        return user
+        log.debug(f'Decoded claims: {claims}')
+        return self.get_or_create_user(claims)
 
-    def create_user(self, claims):
+    def get_or_create_user(self, claims):
         '''
         Create the user if it doesn't exist yet
 
@@ -145,25 +147,39 @@ class AdfsAuthBackend(object):
         '''
         user_id = claims.get("oid")
         if not user_id:
-            log.error(
-                "User claim's doesn't have the claim '%s' in his claims: %s"
-                % ('oid', claims)
-            )
+            log.error(f"User claim's doesn't have the claim 'oid' in his claims: {claims}")
             raise PermissionError
 
         email = claims.get('unique_name')
         ckan_id = f'{AUTH_SERVICE}-{user_id}'
+        username = self.sanitize_username(claims.get('name', ckan_id))
+        fullname = f'{claims["given_name"]} {claims["family_name"]}'
 
         try:
             user = toolkit.get_action('user_show')(data_dict={'id': ckan_id})
+            log.debug(f"User found --> {user}")
+            dirty = False
+            if user['name'] != username:
+                # in ckan we cannot update the username, a warning will suffice
+                log.warning(f"Username not aligned:  CKAN:[{user['name']}]  ADFS:[{username}]")
+            if user['fullname'] != fullname:
+                log.info(f"Resetting fullname from [{user['fullname']}] to [{fullname}]")
+                user['fullname'] = fullname
+                dirty = True
+            if dirty:
+                # set some fields required when saving
+                user['email'] = email
+                toolkit.get_action('user_update')(
+                    context={'ignore_auth': True},
+                    data_dict=user)
         except NotFound:
             if config[ADFS_CREATE_USER]:
                 user = toolkit.get_action('user_create')(
                     context={'ignore_auth': True},
                     data_dict={
                         'id': ckan_id,
-                        'name': ckan_id,
-                        'fullname': claims['name'],
+                        'name': username,
+                        'fullname': fullname,
                         'password': str(uuid.uuid4()),
                         'email': email,
                         'plugin_extras': {
@@ -171,7 +187,7 @@ class AdfsAuthBackend(object):
                         }
                     },
                 )
-                log.debug(f"User with email '{email}' has been created.")
+                log.debug(f"User created --> {user}")
             else:
                 msg = (
                     f"User with email '{email}' doesn't exist and creating"
@@ -180,6 +196,13 @@ class AdfsAuthBackend(object):
                 log.debug(msg)
                 raise CreateUserException(msg)
         return user
+
+    @staticmethod
+    def sanitize_username(tag: str):
+        tag = substitute_ascii_equivalents(tag)
+        tag = tag.lower().strip()
+        tag = re.sub(r'[^a-zA-Z0-9\- ]', '', tag).replace(' ', '-')
+        return tag
 
     def authenticate_with_code(self, authorization_code=None, **kwargs):
         '''
