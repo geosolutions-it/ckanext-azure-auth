@@ -85,8 +85,8 @@ Default `ad_server` name is `http://login.microsoftonline.com`
 
 For the local environment you can setup callback url like that:
 
-    ckanext.azure_auth.redirect_uri =   'http://localhost/azure/signin'
-    ckanext.azure_auth.auth_callback_path =  '/azure/signin'
+    ckanext.azure_auth.redirect_uri =   http://localhost/azure/signin
+    ckanext.azure_auth.auth_callback_path =  /azure/signin
 
 
 * ad_server - link to https://login.microsoftonline.com or company AD directory
