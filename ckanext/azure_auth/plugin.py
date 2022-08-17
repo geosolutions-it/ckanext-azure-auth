@@ -48,6 +48,7 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
     plugins.implements(plugins.IConfigurer)
     plugins.implements(plugins.ITemplateHelpers)
     plugins.implements(plugins.IAuthenticator)
+    plugins.implements(plugins.IApiToken, inherit=True)
 
     def update_config(self, config):
         '''
