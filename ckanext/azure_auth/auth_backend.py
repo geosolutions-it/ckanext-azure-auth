@@ -156,7 +156,10 @@ class AdfsAuthBackend(object):
         fullname = f'{claims["given_name"]} {claims["family_name"]}'
 
         try:
-            user = toolkit.get_action('user_show')(data_dict={'id': ckan_id})
+            user = toolkit.get_action('user_show')(
+                context={'ignore_auth': True},
+                data_dict={'id': ckan_id}
+            )
             log.debug(f"User found --> {user}")
             dirty = False
             if user['name'] != username:

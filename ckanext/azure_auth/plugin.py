@@ -2,10 +2,14 @@ import logging
 import requests
 
 from ckan.logic import get_action, NotAuthorized
-from ckan.common import g, session
+from ckan.common import g, session, config as ckan_config
 from ckan.exceptions import CkanConfigurationException
 import ckan.plugins as plugins
 import ckan.plugins.toolkit as toolkit
+from typing import Any
+import jwt
+from .aadtoken import get_public_key
+
 
 from ckanext.azure_auth.auth_config import (
     AUTH_SERVICE,
@@ -44,6 +48,7 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
     plugins.implements(plugins.IConfigurer)
     plugins.implements(plugins.ITemplateHelpers)
     plugins.implements(plugins.IAuthenticator)
+    plugins.implements(plugins.IApiToken, inherit=True)
 
     def update_config(self, config):
         '''
@@ -176,3 +181,22 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
 
     def abort(self, status_code, detail, headers, comment):
         return status_code, detail, headers, comment
+
+    # IApiToken
+    def decode_api_token(
+        self, encoded: str, **kwargs: Any) -> Any:
+
+        client_id = f'api://{ckan_config[ATTR_CLIENT_ID]}'
+        tenant_id = ckan_config[ATTR_TENANT_ID]
+
+        issuer = 'https://sts.windows.net/{tenant_id}/'.format(tenant_id=tenant_id)
+
+        public_key = get_public_key(encoded)
+        decoded = jwt.decode(encoded,
+                            public_key,
+                            verify=True,
+                            algorithms=['RS256'],
+                            audience=[client_id],
+                            issuer=issuer)
+
+        return decoded

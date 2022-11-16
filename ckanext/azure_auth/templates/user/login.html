@@ -30,18 +30,7 @@
           {% endif %}
         </div>
       </fieldset>
-    </div>
-
-    <div class="login-block ckan">
-      <fieldset>
-        <legend>
-          {{ _('Use your {site_title} username and password').format(site_title=g.site_title) }}
-        </legend>
-        {% block form %}
-          {% snippet "user/snippets/login_form.html", action=c.login_handler, error_summary=error_summary %}
-        {% endblock %}
-      </fieldset>
-    </div>
+    </div>    
     </div>
   </section>
 {% endblock %}
