@@ -3,6 +3,7 @@ import requests
 
 from ckan.logic import get_action, NotAuthorized
 from ckan.common import g, session
+from ckan.common import config as ckan_config
 from ckan.exceptions import CkanConfigurationException
 import ckan.plugins as plugins
 import ckan.plugins.toolkit as toolkit
@@ -22,11 +23,13 @@ from ckanext.azure_auth.auth_config import (
     ATTR_METADATA_URL,
     ATTR_REDIRECT_URL,
     ATTR_TENANT_ID,
+    ATTR_SERVICE_DOMAIN,
     ATTR_WT_REALM,
     AZURE_AD_SERVER_URL,
     ATTR_LOGIN_LABEL, ATTR_LOGIN_BUTTON,
     ProviderConfig,
     RENDERABLE_ATTRS,
+    B2CProviderConfig,
 )
 
 from ckanext.azure_auth.blueprint import azure_auth_blueprint, azure_admin_blueprint
@@ -118,7 +121,6 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
         return schema
 
     def get_helpers(self):
-
         def is_adfs_user(user_id: str):
             user = toolkit.get_action('user_show')(data_dict={'id': user_id})
             return user['id'].startswith(AUTH_SERVICE)
@@ -129,11 +131,32 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
             return get_action('config_option_show')({'ignore_auth': True}, {'key': key})
 
         try:
-            provider_config = ProviderConfig()
+            service_domain = ckan_config.get(ATTR_SERVICE_DOMAIN)
+            tenant_id = ckan_config.get(ATTR_TENANT_ID)
+            client_id = ckan_config.get(ATTR_CLIENT_ID)
+            redirect_uri = ckan_config.get(ATTR_REDIRECT_URL)
+
+            if tenant_id and tenant_id != 'adfs':
+                # Azure B2C / MyIdentity mode
+                policy = ckan_config.get('ckanext.azure_auth.policy')
+                provider_config = B2CProviderConfig(
+                    service_domain = service_domain,
+                    tenant_id=tenant_id,
+                    policy=policy,
+                    client_id=client_id,
+                    redirect_uri=redirect_uri
+                )
+            else:
+                # Classic ADFS mode
+                provider_config = ProviderConfig()
+
+            # Load endpoints
+            provider_config.load_config()
+
+            # --- FIX: return the actual string, not a lambda ---
             adfs_authentication_endpoint_error = ''
-            adfs_authentication_endpoint = (
-                provider_config.build_authorization_endpoint()
-            )
+            adfs_authentication_endpoint = provider_config.build_authorization_endpoint()
+
         except RuntimeError as err:
             log.critical(err)
             adfs_authentication_endpoint = False

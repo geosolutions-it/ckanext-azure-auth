@@ -245,3 +245,35 @@ class AdfsAuthBackend(object):
         access_token = access_token.decode()
         user = self.process_access_token(access_token)
         return user
+
+
+class B2CAuthBackend(AdfsAuthBackend):
+    def authenticate_with_code(self, authorization_code=None, **kwargs):
+        """
+        Authenticate users against Azure B2C (MyIdentity) using
+        Authorization Code flow.
+        """
+
+        self.provider_config.load_config()
+
+        if not authorization_code:
+            log.debug('No authorization code was received')
+            return None
+
+        token_response = self.exchange_auth_code(authorization_code)
+
+        # Azure B2C identity is ALWAYS in id_token
+        id_token = token_response.get('id_token')
+        if not id_token:
+            raise RuntimeIssueException('No id_token returned by B2C')
+
+        # Optional: keep access_token if needed later
+        access_token = token_response.get('access_token')
+
+        # Process identity (reuse existing logic)
+        user = self.process_access_token(
+            id_token,
+            token_response
+        )
+
+        return user

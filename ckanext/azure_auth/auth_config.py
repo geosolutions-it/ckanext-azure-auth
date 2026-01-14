@@ -28,6 +28,7 @@ ATTR_HELP_TEXT = f'{_EXTNAME}.login_help_text'
 ATTR_AUTH_CALLBACK_PATH = f'{_EXTNAME}.auth_callback_path'
 ATTR_TENANT_ID = f'{_EXTNAME}.tenant_id'
 ATTR_CLIENT_ID = f'{_EXTNAME}.client_id'
+ATTR_SERVICE_DOMAIN = f'{_EXTNAME}.service_domain'
 ATTR_ADSF_AUDIENCE = f'{_EXTNAME}.audience'
 ATTR_CLIENT_SECRET = f'{_EXTNAME}.client_secret'
 ATTR_FORCE_MFA = f'{_EXTNAME}.force_mfa'
@@ -259,3 +260,92 @@ class ProviderConfig(object):
         '''
         self.load_config()
         return self.end_session_endpoint
+
+
+class B2CProviderConfig(ProviderConfig):
+    def __init__(self, service_domain, tenant_id, policy, client_id, redirect_uri, service_id=None, spidl='2'):
+        super().__init__()
+        self.service_domain = service_domain
+        self.tenant_id = tenant_id
+        self.policy = policy
+        self.client_id = client_id
+        self.redirect_uri = redirect_uri
+        self.service_id = service_id
+        self.spidl = spidl
+        self.session = requests.Session()
+
+    def load_config(self):
+        """
+        Load OpenID Connect configuration from Azure B2C (MyIdentity)
+        """
+        # Use the exact URL from the docs
+        config_url = (
+            f"https://{self.service_domain}/"
+            f"{self.tenant_id}/v2.0/.well-known/openid-configuration?p={self.policy}"
+        )
+
+        resp = self.session.get(config_url, timeout=120)
+        resp.raise_for_status()
+        cfg = resp.json()
+
+        # Set endpoints
+        self.authorization_endpoint = cfg['authorization_endpoint']  # will be like .../oauth2/v2.0/authorize
+        self.token_endpoint = cfg['token_endpoint']
+        self.end_session_endpoint = cfg.get('end_session_endpoint')
+        self.issuer = cfg['issuer']
+
+    def build_authorization_endpoint(self, redirect_to_path='/'):
+        """
+        Build the authorization URL for B2C login.
+        """
+
+        # Ensure config loaded
+        self.load_config()
+
+        state = base64.urlsafe_b64encode(redirect_to_path.encode()).decode()
+
+        # Do NOT add 'p' again! Already included in authorization_endpoint
+        query = {
+            'client_id': self.client_id,
+            'redirect_uri': self.redirect_uri,
+            'response_type': 'code',
+            'scope': 'openid',
+            'state': state,
+            'prompt': 'login',
+            'nonce': 'defaultNonce',
+        }
+
+        if self.spidl:
+            query['spidl'] = self.spidl
+        if self.service_id:
+            query['serviceId'] = self.service_id
+
+        url = f"{self.authorization_endpoint}&{urlencode(query)}"
+        log.info(f"B2C authorization URL: {url}")
+        return url
+    
+    def exchange_code_for_token(self, code):
+        """
+        Exchange authorization code for tokens (Azure B2C Authorization Code Flow)
+        """
+        token_url = (
+            f"https://{self.service_domain}/"
+            f"{self.tenant_id}/"
+            f"{self.policy}/oauth2/v2.0/token"
+        )
+
+        data = {
+            'grant_type': 'authorization_code',
+            'client_id': self.client_id,
+            'code': code,
+            'redirect_uri': self.redirect_uri,
+            'scope': 'openid',
+        }
+
+        headers = {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        }
+
+        resp = self.session.post(token_url, data=data, headers=headers, timeout=120)
+        resp.raise_for_status()
+        return resp.json()
