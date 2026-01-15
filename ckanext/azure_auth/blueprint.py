@@ -3,6 +3,7 @@ from functools import partial
 import logging
 
 from flask import Blueprint, request, session
+from ckan.plugins import toolkit
 
 from ckan import logic
 from ckan.common import config, g, _
@@ -92,18 +93,18 @@ azure_auth_blueprint = Blueprint(u'azure_auth', __name__)
 def token_login():
     data = request.get_json()
     id_token = data.get('id_token')
-    if not id_token:
-        return "Missing id_token", 400
-
+    
     try:
         auth_backend = get_auth_backend()
-
-        user = auth_backend.process_access_token(id_token)
-        # Set CKAN current user
-        g.user = user['name']
-        # Log user in (CKAN session)
-        session['user'] = user['name']
-        session.save()
+        user_dict = auth_backend.process_access_token(id_token)
+        
+        user_obj = model.User.get(user_dict['name'])
+        
+        if not user_obj:
+            return "User not found in CKAN database", 404
+            
+        toolkit.login_user(user_obj)
+        
         return "", 200
     except Exception as e:
         log.exception("Failed to process id_token")

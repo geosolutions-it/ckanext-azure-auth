@@ -34,8 +34,6 @@ def login_callback():
 
     tenant_id = config.get('ckanext.azure_auth.tenant_id')
 
-    import pdb; pdb.set_trace()
-
     # B2C implicit flow
     if tenant_id and tenant_id != 'adfs':
         # Just render the page with JS that posts id_token to /azure/token
