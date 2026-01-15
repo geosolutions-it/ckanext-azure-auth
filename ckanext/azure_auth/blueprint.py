@@ -1,7 +1,8 @@
 # encoding: utf-8
 from functools import partial
+import logging
 
-from flask import Blueprint, request
+from flask import Blueprint, request, session
 
 from ckan import logic
 from ckan.common import config, g, _
@@ -16,6 +17,11 @@ from ckanext.azure_auth.auth_config import (
     ATTR_LOGIN_LABEL,
     ATTR_LOGIN_BUTTON,
 )
+from ckanext.azure_auth.auth_backend import B2CAuthBackend
+from ckanext.azure_auth.auth_config import B2CProviderConfig
+
+# Initialize logger
+log = logging.getLogger(__name__)
 
 azure_admin_blueprint = Blueprint(u'azure_admin', __name__)
 
@@ -23,6 +29,25 @@ azure_admin_blueprint = Blueprint(u'azure_admin', __name__)
 def build_extra_admin_nav():
     u'''Return results of helpers.build_extra_admin_nav for testing.'''
     return helpers.build_extra_admin_nav()
+
+def get_auth_backend():
+    tenant_id = config.get('ckanext.azure_auth.tenant_id')
+    client_id = config.get('ckanext.azure_auth.client_id')
+    service_domain = config.get('ckanext.azure_auth.service_domain')
+    policy = config.get('ckanext.azure_auth.policy')
+    redirect_uri = config.get('ckanext.azure_auth.redirect_uri')
+
+    provider_config = B2CProviderConfig(
+        service_domain=service_domain,
+        tenant_id=tenant_id,
+        policy=policy,
+        client_id=client_id,
+        redirect_uri=redirect_uri,
+    )
+
+    provider_config.load_config()
+
+    return B2CAuthBackend(provider_config=provider_config)
 
 
 azure_admin_blueprint.add_url_rule(
@@ -61,8 +86,28 @@ def azure_auth_config():
             'title': u'ADFS configuration'}
     )
 
-
 azure_auth_blueprint = Blueprint(u'azure_auth', __name__)
+
+@azure_auth_blueprint.route('/azure/token', methods=['POST'])
+def token_login():
+    data = request.get_json()
+    id_token = data.get('id_token')
+    if not id_token:
+        return "Missing id_token", 400
+
+    try:
+        auth_backend = get_auth_backend()
+
+        user = auth_backend.process_access_token(id_token)
+        # Set CKAN current user
+        g.user = user['name']
+        # Log user in (CKAN session)
+        session['user'] = user['name']
+        session.save()
+        return "", 200
+    except Exception as e:
+        log.exception("Failed to process id_token")
+        return str(e), 400
 
 azure_auth_blueprint.add_url_rule(
     rule=config[ATTR_AUTH_CALLBACK_PATH],

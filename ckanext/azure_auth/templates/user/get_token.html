@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Azure Login Callback</title>
+</head>
+<body>
+<script>
+(function() {
+    // Check if the URL fragment contains id_token
+    const hash = window.location.hash.substr(1); // remove '#'
+    const params = new URLSearchParams(hash);
+    const id_token = params.get('id_token');
+    if (id_token) {
+        // POST token to backend endpoint (same-origin via proxy)
+        fetch('/azure/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id_token })
+        }).then(resp => {
+            if (resp.ok) {
+                // Clean up URL
+                window.history.replaceState({}, document.title, '/');
+                window.location.href = '/'; // redirect to homepage
+            } else {
+                console.error('Login failed');
+            }
+        }).catch(console.error);
+    }
+})();
+</script>
+</body>
+</html>

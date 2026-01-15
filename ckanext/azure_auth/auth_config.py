@@ -1,5 +1,7 @@
 import base64
 import logging
+import json
+import jwt
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
 from xml.etree import ElementTree
@@ -294,6 +296,14 @@ class B2CProviderConfig(ProviderConfig):
         self.end_session_endpoint = cfg.get('end_session_endpoint')
         self.issuer = cfg['issuer']
 
+        # Fetch JWKS (signing keys)
+        jwks_uri = cfg['jwks_uri']
+        jwks_resp = self.session.get(jwks_uri, timeout=30)
+        jwks_resp.raise_for_status()
+        self.signing_keys = [
+            jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(k)) for k in jwks_resp.json()['keys']
+    ]
+
     def build_authorization_endpoint(self, redirect_to_path='/'):
         """
         Build the authorization URL for B2C login.
@@ -308,7 +318,7 @@ class B2CProviderConfig(ProviderConfig):
         query = {
             'client_id': self.client_id,
             'redirect_uri': self.redirect_uri,
-            'response_type': 'code',
+            'response_type': 'id_token',
             'scope': 'openid',
             'state': state,
             'prompt': 'login',
@@ -323,29 +333,3 @@ class B2CProviderConfig(ProviderConfig):
         url = f"{self.authorization_endpoint}&{urlencode(query)}"
         log.info(f"B2C authorization URL: {url}")
         return url
-    
-    def exchange_code_for_token(self, code):
-        """
-        Exchange authorization code for tokens (Azure B2C Authorization Code Flow)
-        """
-        token_url = (
-            f"https://{self.service_domain}/"
-            f"{self.tenant_id}/"
-            f"{self.policy}/oauth2/v2.0/token"
-        )
-
-        data = {
-            'grant_type': 'authorization_code',
-            'client_id': self.client_id,
-            'code': code,
-            'redirect_uri': self.redirect_uri,
-            'scope': 'openid',
-        }
-
-        headers = {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        }
-
-        resp = self.session.post(token_url, data=data, headers=headers, timeout=120)
-        resp.raise_for_status()
-        return resp.json()

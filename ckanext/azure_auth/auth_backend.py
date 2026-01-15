@@ -7,7 +7,9 @@ import jwt
 from ckan.common import _, config, session
 from ckan.lib.munge import substitute_ascii_equivalents
 from ckan.logic import NotFound
+from ckan.logic import get_action
 from ckan.plugins import toolkit
+
 from ckanext.azure_auth.auth_config import (
     ADFS_CREATE_USER,
     ADFS_SESSION_PREFIX,
@@ -248,32 +250,169 @@ class AdfsAuthBackend(object):
 
 
 class B2CAuthBackend(AdfsAuthBackend):
-    def authenticate_with_code(self, authorization_code=None, **kwargs):
-        """
-        Authenticate users against Azure B2C (MyIdentity) using
-        Authorization Code flow.
-        """
+    """
+    Authentication backend for Azure B2C (MyIdentity) using implicit flow (id_token).
+    Inherits from AdfsAuthBackend to reuse token validation and CKAN user creation.
+    """
 
-        self.provider_config.load_config()
+    def process_access_token(self, id_token):
+        """
+        Process an Azure B2C id_token directly.
+        """
+        if not id_token:
+            raise PermissionError("No id_token provided")
 
-        if not authorization_code:
-            log.debug('No authorization code was received')
+        log.debug(f'Received id_token: {id_token}')
+
+        # Validate and decode the token
+        claims = self.validate_access_token(id_token)
+        if not claims:
+            raise PermissionError("Invalid id_token")
+
+        log.debug(f'Decoded claims: {claims}')
+
+        # Get or create CKAN user from token claims
+        return self.get_or_create_user(claims)
+    
+    def authenticate_with_id_token(self, id_token: str):
+        """
+        Authenticate a user using the id_token returned by Azure B2C implicit flow.
+
+        :param id_token: JWT token received in the redirect from Azure B2C
+        :return: CKAN user dict
+        """
+        if not id_token:
+            log.debug("No id_token received from Azure B2C")
             return None
 
-        token_response = self.exchange_auth_code(authorization_code)
+        # Validate the JWT and extract claims
+        claims = self.validate_access_token(id_token)
+        if not claims:
+            raise PermissionError("Invalid id_token received")
 
-        # Azure B2C identity is ALWAYS in id_token
-        id_token = token_response.get('id_token')
-        if not id_token:
-            raise RuntimeIssueException('No id_token returned by B2C')
+        log.debug(f"Decoded claims from id_token: {claims}")
 
-        # Optional: keep access_token if needed later
-        access_token = token_response.get('access_token')
+        # Create or update the CKAN user based on claims
+        user = self.get_or_create_user(claims)
+        return user
+    
+    def validate_access_token(self, access_token):
+        """
+        Validate a B2C JWT (id_token) using the provider's JWKS.
+        This is only for Azure B2C, not classic ADFS.
+        """
+        if not self.provider_config.signing_keys:
+            raise PermissionError("No signing keys available to validate token")
 
-        # Process identity (reuse existing logic)
-        user = self.process_access_token(
-            id_token,
-            token_response
-        )
+        audience = self.provider_config.client_id  # B2C uses client_id as audience
+
+        for idx, key in enumerate(self.provider_config.signing_keys):
+            try:
+                options = {
+                    'verify_signature': True,
+                    'verify_exp': True,
+                    'verify_nbf': True,
+                    'verify_iat': True,
+                    'verify_aud': True,
+                    'verify_iss': True,
+                    'require_exp': False,
+                    'require_iat': False,
+                    'require_nbf': False,
+                }
+
+                # Validate token and return claims
+                return jwt.decode(
+                    access_token,
+                    key=key,
+                    algorithms=['RS256', 'RS384', 'RS512'],
+                    audience=audience,
+                    issuer=self.provider_config.issuer,
+                    options=options,
+                    leeway=config.get('ckanext.azure_auth.jwt_leeway', 0),
+                )
+
+            except jwt.ExpiredSignatureError as error:
+                log.info(f'Signature has expired: {error}')
+                raise PermissionError
+            except jwt.DecodeError as error:
+                if idx < len(self.provider_config.signing_keys) - 1:
+                    continue
+                else:
+                    log.info(f'Error decoding signature: {error}')
+                    raise PermissionError
+            except jwt.InvalidTokenError as error:
+                log.info(str(error))
+                raise PermissionError
+            
+    def get_or_create_user(self, claims):
+        """
+        Create or update a CKAN user from Azure B2C claims.
+
+        Args:
+            claims (dict): JWT claims from B2C id_token
+
+        Returns:
+            dict: CKAN user dict
+        """
+        
+        user_id = claims.get("sub")
+        if not user_id:
+            log.error(f"No unique user identifier ('sub') in claims: {claims}")
+            raise PermissionError
+
+        # Extract email from claims
+        email = claims.get("email")
+        if not email:
+            log.warning(f"No email in claims for user {user_id}, using placeholder")
+            email = f"{user_id}@example.com"
+
+        # Build CKAN identifiers
+        ckan_id = f'{AUTH_SERVICE}-{user_id}'
+        username = self.sanitize_username(claims.get("name", ckan_id)).strip()
+        fullname = f'{claims.get("given_name", "")} {claims.get("family_name", "")}'.strip()
+        if not fullname:
+            fullname = username
+
+        # Try to find existing CKAN user
+        try:
+            user = get_action('user_show')(data_dict={'id': ckan_id})
+            log.debug(f"User found --> {user}")
+
+            dirty = False
+            if user.get('fullname') != fullname:
+                log.info(f"Updating fullname: {user.get('fullname')} -> {fullname}")
+                user['fullname'] = fullname
+                dirty = True
+            if user.get('email') != email:
+                log.info(f"Updating email: {user.get('email')} -> {email}")
+                user['email'] = email
+                dirty = True
+            if dirty:
+                get_action('user_update')(
+                    context={'ignore_auth': True},
+                    data_dict=user
+                )
+
+        except NotFound:
+            # Create user if enabled
+            if config.get(ADFS_CREATE_USER, False):
+                user = get_action('user_create')(
+                    context={'ignore_auth': True},
+                    data_dict={
+                        'id': ckan_id,
+                        'name': username,
+                        'fullname': fullname,
+                        'email': email,
+                        'password': str(uuid.uuid4()),
+                        'plugin_extras': {
+                            'azure_auth': user_id
+                        }
+                    }
+                )
+                log.debug(f"User created --> {user}")
+            else:
+                msg = f"User with email '{email}' doesn't exist and creating users is disabled."
+                log.error(msg)
+                raise CreateUserException(msg)
 
         return user
