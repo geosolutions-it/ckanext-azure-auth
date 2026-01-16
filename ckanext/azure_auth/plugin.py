@@ -31,6 +31,7 @@ from ckanext.azure_auth.auth_config import (
     ProviderConfig,
     RENDERABLE_ATTRS,
     B2CProviderConfig,
+    ATTR_SPIDL,
 )
 
 from ckanext.azure_auth.blueprint import azure_auth_blueprint, azure_admin_blueprint, get_auth_backend
@@ -137,6 +138,7 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
             tenant_id = ckan_config.get(ATTR_TENANT_ID)
             client_id = ckan_config.get(ATTR_CLIENT_ID)
             redirect_uri = ckan_config.get(ATTR_REDIRECT_URL)
+            spidl = ckan_config.get(ATTR_SPIDL)
 
             if mode == 'b2c':
                 # Azure B2C / MyIdentity mode
@@ -146,7 +148,8 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
                     tenant_id=tenant_id,
                     policy=policy,
                     client_id=client_id,
-                    redirect_uri=redirect_uri
+                    redirect_uri=redirect_uri,
+                    spidl=spidl,
                 )
             else:
                 # Classic ADFS mode

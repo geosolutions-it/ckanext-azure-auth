@@ -37,6 +37,9 @@ ATTR_CLIENT_SECRET = f'{_EXTNAME}.client_secret'
 ATTR_FORCE_MFA = f'{_EXTNAME}.force_mfa'
 ATTR_DISABLE_SSO = f'{_EXTNAME}.disable_sso'
 
+#SPID level
+ATTR_SPIDL = f'{_EXTNAME}.spidl'
+
 # Config keys: Configured at runtime
 ATTR_REDIRECT_URL = f'{_EXTNAME}.redirect_uri'
 ATTR_CREATE_USER = f'{_EXTNAME}.allow_create_users'

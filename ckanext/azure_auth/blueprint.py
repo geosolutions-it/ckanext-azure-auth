@@ -38,6 +38,7 @@ def get_auth_backend():
     service_domain = config.get('ckanext.azure_auth.service_domain')
     policy = config.get('ckanext.azure_auth.policy')
     redirect_uri = config.get('ckanext.azure_auth.redirect_uri')
+    spidl = config.get('ckanext.azure_auth.spidl')
 
     provider_config = B2CProviderConfig(
         service_domain=service_domain,
@@ -45,6 +46,7 @@ def get_auth_backend():
         policy=policy,
         client_id=client_id,
         redirect_uri=redirect_uri,
+        spidl = spidl,
     )
 
     provider_config.load_config()
