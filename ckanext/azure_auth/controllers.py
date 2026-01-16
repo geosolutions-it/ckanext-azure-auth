@@ -32,49 +32,59 @@ def login_callback():
     Handle login callback for both Azure B2C (implicit flow) and classic ADFS (authorization code flow).
     """
 
-    tenant_id = config.get('ckanext.azure_auth.tenant_id')
+    mode = config.get('ckanext.azure_auth.mode')
 
     # B2C implicit flow
-    if tenant_id and tenant_id != 'adfs':
+    if mode == "b2c":
         # Just render the page with JS that posts id_token to /azure/token
         return base.render('user/get_token.html')
 
     # Classic ADFS code flow
     code = request.params.get('code')
-    if not code:
-        # No code received, nothing to do
-        log.debug('No authorization code received for ADFS login')
-        base.abort(401, _('Login failed or account disabled'))
-
-    # Load ADFS backend
-    provider = ProviderConfig()
-    auth_backend = AdfsAuthBackend(provider_config=provider)
-    provider.load_config()
+    provider_config = ProviderConfig()
+    auth_backend = AdfsAuthBackend(provider_config=provider_config)
 
     try:
-        user = auth_backend.authenticate_with_code(code)
+        user = auth_backend.authenticate_with_code(authorization_code=code)
     except MFARequiredException:
-        return toolkit.redirect(provider.build_authorization_endpoint())
+        return helpers.redirect_to(
+            provider_config.build_authorization_endpoint(
+                request, force_mfa=True
+            )  # no params needed - FIXME
+        )
     except CreateUserException as e:
+        log.debug(str(e))
+        base.abort(403, str(e))
+    except (AzureReloginRequiredException, RuntimeIssueException) as e:
+        log.debug(str(e))
         base.abort(403, str(e))
     except Exception as e:
-        base.abort(400, str(e))
+        log.debug(str(e))
+        base.abort(400, 'No authorization code was provided.')
 
-    if user and user.get('state') == State.ACTIVE:
-        g.user = user['name']
-        session[f'{ADFS_SESSION_PREFIX}user'] = user['name']
-        session.save()
+    if user:
+        if user['state'] == State.ACTIVE:
+            g.user = user['name']
+            session[f'{ADFS_SESSION_PREFIX}user'] = user['name']
+            session.save()
 
-        # Decode state safely
-        state = request.params.get('state')
-        if state:
-            try:
-                redirect_to = base64.urlsafe_b64decode(state.encode()).decode()
-                return toolkit.redirect_to(redirect_to)
-            except Exception:
-                log.exception('Failed to decode state parameter')
-                return toolkit.redirect_to(controller='user', action='dashboard')
+            # Redirect to the "after login" page.
+            # Because we got redirected from ADFS, we can't know where the
+            # user came from.
+
+            redirect_to = request.params.get('state')
+            if redirect_to:
+                redirect_to = base64.urlsafe_b64decode(
+                    redirect_to.encode()
+                ).decode()
+            else:
+                toolkit.redirect_to(controller='user', action='dashboard')
+
+            # TODO: validate URL
+            return toolkit.redirect_to(redirect_to)
         else:
-            return toolkit.redirect_to(controller='user', action='dashboard')
+            # Return a 'disabled account' error message
+            base.abort(403, 'Your account is disabled.')
     else:
-        base.abort(401, _('Login failed or account disabled'))
+        # Return an 'invalid login' error message
+        base.abort(401, 'Login failed.')

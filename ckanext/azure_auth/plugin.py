@@ -9,8 +9,9 @@ import ckan.plugins as plugins
 import ckan.plugins.toolkit as toolkit
 
 from ckanext.azure_auth.auth_config import (
+    ATTR_MODE,
     AUTH_SERVICE,
-    ADFS_CREATE_USER,
+    ATTR_CREATE_USER,
     ADFS_SESSION_PREFIX,
     ATTR_ADSF_AUDIENCE,
     ATTR_AD_SERVER,
@@ -131,12 +132,13 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
             return get_action('config_option_show')({'ignore_auth': True}, {'key': key})
 
         try:
+            mode = ckan_config.get(ATTR_MODE)
             service_domain = ckan_config.get(ATTR_SERVICE_DOMAIN)
             tenant_id = ckan_config.get(ATTR_TENANT_ID)
             client_id = ckan_config.get(ATTR_CLIENT_ID)
             redirect_uri = ckan_config.get(ATTR_REDIRECT_URL)
 
-            if tenant_id and tenant_id != 'adfs':
+            if mode == 'b2c':
                 # Azure B2C / MyIdentity mode
                 policy = ckan_config.get('ckanext.azure_auth.policy')
                 provider_config = B2CProviderConfig(

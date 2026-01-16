@@ -11,7 +11,7 @@ from ckan.logic import get_action
 from ckan.plugins import toolkit
 
 from ckanext.azure_auth.auth_config import (
-    ADFS_CREATE_USER,
+    ATTR_CREATE_USER,
     ADFS_SESSION_PREFIX,
     ATTR_ADSF_AUDIENCE,
     ATTR_CLIENT_ID,
@@ -175,7 +175,7 @@ class AdfsAuthBackend(object):
                     context={'ignore_auth': True},
                     data_dict=user)
         except NotFound:
-            if config[ADFS_CREATE_USER]:
+            if config[ATTR_CREATE_USER]:
                 user = toolkit.get_action('user_create')(
                     context={'ignore_auth': True},
                     data_dict={
@@ -395,7 +395,7 @@ class B2CAuthBackend(AdfsAuthBackend):
 
         except NotFound:
             # Create user if enabled
-            if config.get(ADFS_CREATE_USER, False):
+            if config.get(ATTR_CREATE_USER, False):
                 user = get_action('user_create')(
                     context={'ignore_auth': True},
                     data_dict={

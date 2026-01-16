@@ -23,6 +23,7 @@ AUTH_SERVICE = 'adfs'
 ADFS_SESSION_PREFIX = 'adfs-'
 
 # Config keys
+ATTR_MODE = f'{_EXTNAME}.mode'
 ATTR_AD_SERVER = f'{_EXTNAME}.ad_server'
 ATTR_WT_REALM = f'{_EXTNAME}.wtrealm'
 ATTR_METADATA_URL = f'{_EXTNAME}.metadata_url'
@@ -38,7 +39,7 @@ ATTR_DISABLE_SSO = f'{_EXTNAME}.disable_sso'
 
 # Config keys: Configured at runtime
 ATTR_REDIRECT_URL = f'{_EXTNAME}.redirect_uri'
-ADFS_CREATE_USER = f'{_EXTNAME}.allow_create_users'
+ATTR_CREATE_USER = f'{_EXTNAME}.allow_create_users'
 
 ATTR_LOGIN_LABEL = f'{_EXTNAME}.login_label'
 ATTR_LOGIN_BUTTON = f'{_EXTNAME}.login_button'
