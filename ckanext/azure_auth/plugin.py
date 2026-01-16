@@ -33,7 +33,7 @@ from ckanext.azure_auth.auth_config import (
     B2CProviderConfig,
 )
 
-from ckanext.azure_auth.blueprint import azure_auth_blueprint, azure_admin_blueprint
+from ckanext.azure_auth.blueprint import azure_auth_blueprint, azure_admin_blueprint, get_auth_backend
 
 log = logging.getLogger(__name__)
 requests.packages.urllib3.add_stderr_logger()
@@ -201,3 +201,11 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
 
     def abort(self, status_code, detail, headers, comment):
         return status_code, detail, headers, comment
+    
+    # IAuthenticator
+    def authenticate(self, identity):
+        """
+        Do not handle username/password authentication.
+        Let CKAN's built-in authenticator handle local users.
+        """
+        return None

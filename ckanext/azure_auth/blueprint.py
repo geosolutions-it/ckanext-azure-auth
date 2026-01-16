@@ -17,6 +17,7 @@ from ckanext.azure_auth.auth_config import (
     ATTR_AUTH_CALLBACK_PATH,
     ATTR_LOGIN_LABEL,
     ATTR_LOGIN_BUTTON,
+    ADFS_SESSION_PREFIX
 )
 from ckanext.azure_auth.auth_backend import B2CAuthBackend
 from ckanext.azure_auth.auth_config import B2CProviderConfig
@@ -109,6 +110,25 @@ def token_login():
     except Exception as e:
         log.exception("Failed to process id_token")
         return str(e), 400
+
+@azure_auth_blueprint.route('/user/_logout')
+def logout():
+    userobj = getattr(g, 'userobj', None)
+
+    if userobj and userobj.name.startswith(('adfs-', 'b2c-')):
+        log.info(f"Azure user detected: {userobj.name}. Performing Azure logout.")
+
+        # Logout CKAN session
+        toolkit.logout_user()
+
+        # Redirect to Azure logout
+        backend = get_auth_backend()
+        azure_logout_url = backend.provider_config.build_logout_endpoint()
+        return toolkit.redirect_to(azure_logout_url)
+
+    # For local CKAN users
+    toolkit.logout_user()
+    return toolkit.redirect_to('/')
 
 azure_auth_blueprint.add_url_rule(
     rule=config[ATTR_AUTH_CALLBACK_PATH],

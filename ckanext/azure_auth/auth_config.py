@@ -334,3 +334,30 @@ class B2CProviderConfig(ProviderConfig):
         url = f"{self.authorization_endpoint}&{urlencode(query)}"
         log.info(f"B2C authorization URL: {url}")
         return url
+    
+    def build_logout_endpoint(self):
+        """
+        Constructs the B2C logout URL dynamically.
+        """
+        if not self.end_session_endpoint:
+            self.load_config()
+
+        # The post_logout_redirect_uri MUST be registered in the Azure Portal
+        post_logout_uri = config.get('ckan.site_url').rstrip('/')
+        
+        params = {
+            'post_logout_redirect_uri': post_logout_uri
+        }
+
+        # IMPORTANT: Including the id_token_hint makes logout much more reliable,
+        # especially for federated providers like SPID.
+        from flask import session as flask_session
+        id_token = flask_session.get(f'{ADFS_SESSION_PREFIX}id_token')
+        if id_token:
+            params['id_token_hint'] = id_token
+        
+        # Safely check if we need a '?' or an '&'
+        separator = '&' if '?' in self.end_session_endpoint else '?'
+        
+        # Construct the final URL
+        return f"{self.end_session_endpoint}{separator}{urlencode(params)}"
