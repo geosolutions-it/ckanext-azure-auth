@@ -132,8 +132,6 @@ And these settings:
     ckanext.azure_auth.tenant_id = <tenant domain>
     ckanext.azure_auth.client_id = <..uuid..>
     ckanext.azure_auth.policy = <policy>
-    ckanext.azure_auth.redirect_uri = http://localhost:8080/azure/signin
-    ckanext.azure_auth.auth_callback_path = /azure/signin
     ckanext.azure_auth.discovery_url = <discovery url>
 
     # Authentication level (spidl)
@@ -145,10 +143,6 @@ For the local environment you can setup callback url like that:
 
     ckanext.azure_auth.redirect_uri =   http://localhost/azure/signin
     ckanext.azure_auth.auth_callback_path =  /azure/signin
-
-
-* ad_server - link to https://login.microsoftonline.com or company AD directory
-* client_secret is located on Certificates & secrets page
 
 Development Environment:
 ------------------------
