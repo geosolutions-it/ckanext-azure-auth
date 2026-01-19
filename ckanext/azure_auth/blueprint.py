@@ -109,11 +109,6 @@ def token_login():
         # Log in CKAN properly
         toolkit.login_user(user_obj)
 
-        # Set g.user and c.user to the **CKAN User object for permissions**
-        g.user = user_obj
-        c.user = user_obj
-
-        # Store just the username string in session for identify()
         session[f'{ADFS_SESSION_PREFIX}user'] = user_dict['name']
         session.save()
         
