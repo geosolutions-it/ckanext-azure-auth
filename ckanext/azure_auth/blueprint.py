@@ -6,7 +6,7 @@ from flask import Blueprint, request, session
 from ckan.plugins import toolkit
 
 from ckan import logic
-from ckan.common import config, g, _
+from ckan.common import config, g, _, c
 import ckan.lib.base as base
 import ckan.lib.helpers as helpers
 from ckan.logic import get_action
@@ -101,12 +101,21 @@ def token_login():
         auth_backend = get_auth_backend()
         user_dict = auth_backend.process_access_token(id_token)
         
+        # Get the CKAN User object
         user_obj = model.User.get(user_dict['name'])
-        
         if not user_obj:
-            return "User not found in CKAN database", 404
-            
+            return "User not found", 404
+
+        # Log in CKAN properly
         toolkit.login_user(user_obj)
+
+        # Set g.user and c.user to the **CKAN User object for permissions**
+        g.user = user_obj
+        c.user = user_obj
+
+        # Store just the username string in session for identify()
+        session[f'{ADFS_SESSION_PREFIX}user'] = user_dict['name']
+        session.save()
         
         return "", 200
     except Exception as e:
