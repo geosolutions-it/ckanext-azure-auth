@@ -378,7 +378,7 @@ class B2CAuthBackend(AdfsAuthBackend):
             raise PermissionError("Missing email claim")
 
         ckan_id = f"{auth_service_type}-{external_id}"
-        username = self.sanitize_username(ckan_id)
+        username = f"{external_id}"
 
         fullname = f"{claims.get('given_name', '')} {claims.get('family_name', '')}".strip()
         if not fullname:
