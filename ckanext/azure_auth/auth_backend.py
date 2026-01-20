@@ -17,7 +17,8 @@ from ckanext.azure_auth.auth_config import (
     ATTR_CLIENT_ID,
     ATTR_CLIENT_SECRET,
     ATTR_REDIRECT_URL,
-    AUTH_SERVICE,
+    ATTR_AUTH_SERVICE,
+    ATTR_USER_ID_TEMPLATE,
     TIMEOUT,
     ProviderConfig,
 )
@@ -147,13 +148,16 @@ class AdfsAuthBackend(object):
         Returns:
             django.contrib.auth.models.User: A Django user
         '''
+        # Get the auth service type
+        auth_service_type = config.get(ATTR_AUTH_SERVICE)
+
         user_id = claims.get("oid")
         if not user_id:
             log.error(f"User claim's doesn't have the claim 'oid' in his claims: {claims}")
             raise PermissionError
 
         email = claims.get('unique_name')
-        ckan_id = f'{AUTH_SERVICE}-{user_id}'
+        ckan_id = f'{auth_service_type}-{user_id}'
         username = self.sanitize_username(claims.get('name', ckan_id))
         fullname = f'{claims["given_name"]} {claims["family_name"]}'
 
@@ -355,63 +359,72 @@ class B2CAuthBackend(AdfsAuthBackend):
             dict: CKAN user dict
         """
         
-        user_id = claims.get("sub")
-        if not user_id:
-            log.error(f"No unique user identifier ('sub') in claims: {claims}")
-            raise PermissionError
+        # Get the auth service type and the user id template
+        auth_service_type = config.get(ATTR_AUTH_SERVICE)
+        user_id_template = config.get(ATTR_USER_ID_TEMPLATE)
 
-        # Extract email from claims
+        if not user_id_template:
+            raise RuntimeError("User ID template not configured")
+
+        try:
+            external_id = user_id_template.format_map(claims)
+            external_id = external_id.strip('"').lower()
+        except KeyError as e:
+            log.error(f"Missing required claim {e}")
+            raise PermissionError
+        
         email = claims.get("email")
         if not email:
-            log.warning(f"No email in claims for user {user_id}, using placeholder")
-            email = f"{user_id}@example.com"
+            raise PermissionError("Missing email claim")
 
-        # Build CKAN identifiers
-        ckan_id = f'{AUTH_SERVICE}-{user_id}'
-        username = self.sanitize_username(claims.get("name", ckan_id)).strip()
-        fullname = f'{claims.get("given_name", "")} {claims.get("family_name", "")}'.strip()
+        ckan_id = f"{auth_service_type}-{external_id}"
+        username = self.sanitize_username(ckan_id)
+
+        fullname = f"{claims.get('given_name', '')} {claims.get('family_name', '')}".strip()
         if not fullname:
             fullname = username
 
-        # Try to find existing CKAN user
         try:
-            user = get_action('user_show')(data_dict={'id': ckan_id})
-            log.debug(f"User found --> {user}")
+            user = get_action("user_show")(
+                {"ignore_auth": True},
+                {"id": ckan_id}
+            )
 
             dirty = False
-            if user.get('fullname') != fullname:
-                log.info(f"Updating fullname: {user.get('fullname')} -> {fullname}")
-                user['fullname'] = fullname
+            if user.get("fullname") != fullname:
+                user["fullname"] = fullname
                 dirty = True
-            if user.get('email') != email:
-                log.info(f"Updating email: {user.get('email')} -> {email}")
-                user['email'] = email
+            if user.get("email") != email:
+                user["email"] = email
                 dirty = True
+
             if dirty:
-                get_action('user_update')(
-                    context={'ignore_auth': True},
-                    data_dict=user
+                get_action("user_update")(
+                    {"ignore_auth": True},
+                    user
                 )
 
         except NotFound:
-            # Create user if enabled
             if config.get(ATTR_CREATE_USER, False):
-                user = get_action('user_create')(
-                    context={'ignore_auth': True},
-                    data_dict={
-                        'id': ckan_id,
-                        'name': username,
-                        'fullname': fullname,
-                        'email': email,
-                        'password': str(uuid.uuid4()),
-                        'plugin_extras': {
-                            'azure_auth': user_id
+                user = get_action("user_create")(
+                    {"ignore_auth": True},
+                    {
+                        "id": ckan_id,
+                        "name": username,
+                        "fullname": fullname,
+                        "email": email,
+                        "password": str(uuid.uuid4()),
+                        "plugin_extras": {
+                            "azure_auth": external_id
                         }
                     }
                 )
                 log.debug(f"User created --> {user}")
             else:
-                msg = f"User with email '{email}' doesn't exist and creating users is disabled."
+                msg = (
+                    f"User '{ckan_id}' does not exist and "
+                    f"user auto-creation is disabled"
+                )
                 log.error(msg)
                 raise CreateUserException(msg)
 

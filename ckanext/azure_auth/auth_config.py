@@ -19,10 +19,10 @@ _EXTNAME = 'ckanext.azure_auth'
 
 AZURE_AD_SERVER_URL = 'https://login.microsoftonline.com'
 
-AUTH_SERVICE = 'adfs'
 ADFS_SESSION_PREFIX = 'adfs-'
 
 # Config keys
+ATTR_AUTH_SERVICE = f'{_EXTNAME}.auth_service_type'
 ATTR_MODE = f'{_EXTNAME}.mode'
 ATTR_AD_SERVER = f'{_EXTNAME}.ad_server'
 ATTR_WT_REALM = f'{_EXTNAME}.wtrealm'
@@ -36,6 +36,7 @@ ATTR_ADSF_AUDIENCE = f'{_EXTNAME}.audience'
 ATTR_CLIENT_SECRET = f'{_EXTNAME}.client_secret'
 ATTR_FORCE_MFA = f'{_EXTNAME}.force_mfa'
 ATTR_DISABLE_SSO = f'{_EXTNAME}.disable_sso'
+ATTR_USER_ID_TEMPLATE = f'{_EXTNAME}.user_id_template'
 
 #SPID level
 ATTR_SPIDL = f'{_EXTNAME}.spidl'

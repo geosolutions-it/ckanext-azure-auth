@@ -10,7 +10,7 @@ import ckan.plugins.toolkit as toolkit
 
 from ckanext.azure_auth.auth_config import (
     ATTR_MODE,
-    AUTH_SERVICE,
+    ATTR_AUTH_SERVICE,
     ATTR_CREATE_USER,
     ADFS_SESSION_PREFIX,
     ATTR_ADSF_AUDIENCE,
@@ -124,8 +124,11 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
 
     def get_helpers(self):
         def is_adfs_user(user_id: str):
+            # Get the auth service type
+            auth_service_type = ckan_config.get(ATTR_AUTH_SERVICE)
+            
             user = toolkit.get_action('user_show')(data_dict={'id': user_id})
-            return user['id'].startswith(AUTH_SERVICE)
+            return user['id'].startswith(auth_service_type)
 
         def get_attrib(key):
             if key not in RENDERABLE_ATTRS:
