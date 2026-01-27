@@ -134,7 +134,6 @@ And these settings:
     ckanext.azure_auth.tenant_id = <tenant domain>
     ckanext.azure_auth.client_id = <..uuid..>
     ckanext.azure_auth.policy = <policy>
-    ckanext.azure_auth.discovery_url = <discovery url>
 
     # Authentication level (spidl)
     ckanext.azure_auth.spidl = 1 # you can select between level 1, 2 or 3

@@ -368,7 +368,7 @@ class B2CAuthBackend(AdfsAuthBackend):
 
         try:
             external_id = user_id_template.format_map(claims)
-            external_id = external_id.strip('"')
+            external_id = external_id.strip('"').lower()
         except KeyError as e:
             log.error(f"Missing required claim {e}")
             raise PermissionError
