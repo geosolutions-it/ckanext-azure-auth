@@ -377,7 +377,6 @@ class B2CAuthBackend(AdfsAuthBackend):
         if not email:
             raise PermissionError("Missing email claim")
 
-        ckan_id = f"{external_id}"
         username = f"{external_id}"
 
         fullname = f"{claims.get('given_name', '')} {claims.get('family_name', '')}".strip()
@@ -387,7 +386,7 @@ class B2CAuthBackend(AdfsAuthBackend):
         try:
             user = get_action("user_show")(
                 {"ignore_auth": True},
-                {"id": ckan_id}
+                {"id": username}
             )
 
             dirty = False
@@ -409,7 +408,6 @@ class B2CAuthBackend(AdfsAuthBackend):
                 user = get_action("user_create")(
                     {"ignore_auth": True},
                     {
-                        "id": ckan_id,
                         "name": username,
                         "fullname": fullname,
                         "email": email,
@@ -419,10 +417,10 @@ class B2CAuthBackend(AdfsAuthBackend):
                         }
                     }
                 )
-                log.debug(f"User created --> {user}")
+                log.debug(f"User created --> {user['id']}")
             else:
                 msg = (
-                    f"User '{ckan_id}' does not exist and "
+                    f"User '{username}' does not exist and "
                     f"user auto-creation is disabled"
                 )
                 log.error(msg)
