@@ -368,7 +368,7 @@ class B2CAuthBackend(AdfsAuthBackend):
 
         try:
             external_id = user_id_template.format_map(claims)
-            external_id = external_id.strip('"').lower()
+            external_id = external_id.strip('"')
         except KeyError as e:
             log.error(f"Missing required claim {e}")
             raise PermissionError
@@ -377,7 +377,7 @@ class B2CAuthBackend(AdfsAuthBackend):
         if not email:
             raise PermissionError("Missing email claim")
 
-        ckan_id = f"{auth_service_type}-{external_id}"
+        ckan_id = f"{external_id}"
         username = f"{external_id}"
 
         fullname = f"{claims.get('given_name', '')} {claims.get('family_name', '')}".strip()
