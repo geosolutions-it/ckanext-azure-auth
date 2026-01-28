@@ -6,7 +6,7 @@ import jwt
 from jwt import decode, PyJWKClient
 from jwt.exceptions import InvalidTokenError
 
-from ckan.common import _, config, session
+from ckan.common import _, config, session, asbool
 from ckan.lib.munge import substitute_ascii_equivalents
 from ckan.logic import NotFound
 from ckan.logic import get_action
@@ -429,7 +429,7 @@ class B2CAuthBackend(AdfsAuthBackend):
                 )
 
         except NotFound:
-            if config.get(ATTR_CREATE_USER, False):
+            if asbool(config.get(ATTR_CREATE_USER, False)):
                 user = get_action("user_create")(
                     {"ignore_auth": True},
                     {

@@ -2,7 +2,14 @@
 from functools import partial
 import logging
 
-from flask import Blueprint, request, session
+from flask import (
+    Blueprint,
+    request, 
+    session, 
+    url_for, 
+    flash, 
+    redirect,
+    )
 from ckan.plugins import toolkit
 
 from ckan import logic
@@ -21,6 +28,7 @@ from ckanext.azure_auth.auth_config import (
 )
 from ckanext.azure_auth.auth_backend import B2CAuthBackend
 from ckanext.azure_auth.auth_config import B2CProviderConfig
+from ckanext.azure_auth.exceptions import CreateUserException
 
 # Initialize logger
 log = logging.getLogger(__name__)
@@ -113,9 +121,16 @@ def token_login():
         session.save()
         
         return "", 200
+    
+    except CreateUserException as e:
+        log.warning(f"Login failed: {str(e)}")
+        flash(str(e), 'error')  # store message in session to potentially show in frontend
+        return redirect(url_for('user.login'))
+
     except Exception as e:
         log.exception("Failed to process id_token")
-        return str(e), 400
+        flash("Unexpected login error", 'error')
+        return redirect(url_for('user.login'))
 
 @azure_auth_blueprint.route('/user/_logout')
 def logout():
