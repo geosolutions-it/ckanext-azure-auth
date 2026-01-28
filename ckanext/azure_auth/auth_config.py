@@ -281,6 +281,13 @@ class B2CProviderConfig(ProviderConfig):
         self.spidl = spidl
         self.session = requests.Session()
 
+        # endpoints / issuer / jwks_uri will be set in load_config
+        self.authorization_endpoint = None
+        self.token_endpoint = None
+        self.end_session_endpoint = None
+        self.issuer = None
+        self.jwks_uri = None
+
     def load_config(self):
         """
         Load OpenID Connect configuration from Azure B2C (MyIdentity)
@@ -301,13 +308,8 @@ class B2CProviderConfig(ProviderConfig):
         self.end_session_endpoint = cfg.get('end_session_endpoint')
         self.issuer = cfg['issuer']
 
-        # Fetch JWKS (signing keys)
-        jwks_uri = cfg['jwks_uri']
-        jwks_resp = self.session.get(jwks_uri, timeout=30)
-        jwks_resp.raise_for_status()
-        self.signing_keys = [
-            jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(k)) for k in jwks_resp.json()['keys']
-    ]
+        # Store the JWKS URI — this is all you need for PyJWKClient
+        self.jwks_uri = cfg['jwks_uri']
 
     def build_authorization_endpoint(self, redirect_to_path='/'):
         """
@@ -318,7 +320,7 @@ class B2CProviderConfig(ProviderConfig):
         self.load_config()
 
         state = base64.urlsafe_b64encode(redirect_to_path.encode()).decode()
-
+        
         # Do NOT add 'p' again! Already included in authorization_endpoint
         query = {
             'client_id': self.client_id,
@@ -327,8 +329,20 @@ class B2CProviderConfig(ProviderConfig):
             'scope': 'openid',
             'state': state,
             'prompt': 'login',
-            'nonce': 'defaultNonce',
         }
+
+        from flask import has_request_context, session
+        import secrets
+
+        if has_request_context():
+            nonce = secrets.token_urlsafe(16)
+            session[f"{ADFS_SESSION_PREFIX}nonce"] = nonce
+        else:
+            # fallback: static nonce (for non-request situations)
+            nonce = 'defaultNonce'
+        
+        # Add dynamic or static nonce in the query
+        query['nonce'] = nonce
 
         if self.spidl:
             query['spidl'] = self.spidl

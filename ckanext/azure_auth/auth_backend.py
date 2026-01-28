@@ -3,6 +3,8 @@ import uuid
 import re
 
 import jwt
+from jwt import decode, PyJWKClient
+from jwt.exceptions import InvalidTokenError
 
 from ckan.common import _, config, session
 from ckan.lib.munge import substitute_ascii_equivalents
@@ -269,7 +271,8 @@ class B2CAuthBackend(AdfsAuthBackend):
         log.debug(f'Received id_token: {id_token}')
 
         # Validate and decode the token
-        claims = self.validate_access_token(id_token)
+        claims = self.execute_token_validation(id_token)
+        
         if not claims:
             raise PermissionError("Invalid id_token")
 
@@ -289,8 +292,9 @@ class B2CAuthBackend(AdfsAuthBackend):
             log.debug("No id_token received from Azure B2C")
             return None
 
-        # Validate the JWT and extract claims
-        claims = self.validate_access_token(id_token)
+        # Start token validation process
+        claims = self.execute_token_validation(id_token)
+        
         if not claims:
             raise PermissionError("Invalid id_token received")
 
@@ -300,54 +304,77 @@ class B2CAuthBackend(AdfsAuthBackend):
         user = self.get_or_create_user(claims)
         return user
     
-    def validate_access_token(self, access_token):
+    def validate_access_token(self, id_token: str, expected_nonce: str):
         """
-        Validate a B2C JWT (id_token) using the provider's JWKS.
-        This is only for Azure B2C, not classic ADFS.
+        Fully compliant Azure B2C ID token validation using PyJWKClient.
+
+        :param id_token: JWT received from the frontend
+        :param expected_nonce: Nonce stored in session
+        :return: Decoded claims dict if valid
         """
-        if not self.provider_config.signing_keys:
-            raise PermissionError("No signing keys available to validate token")
+        if not id_token:
+            raise PermissionError("No id_token provided")
 
-        audience = self.provider_config.client_id  # B2C uses client_id as audience
+        # Use the JWKS URI from your provider config
+        jwk_client = PyJWKClient(self.provider_config.jwks_uri)
 
-        for idx, key in enumerate(self.provider_config.signing_keys):
-            try:
-                options = {
-                    'verify_signature': True,
-                    'verify_exp': True,
-                    'verify_nbf': True,
-                    'verify_iat': True,
-                    'verify_aud': True,
-                    'verify_iss': True,
-                    'require_exp': False,
-                    'require_iat': False,
-                    'require_nbf': False,
-                }
+        import pdb; pdb.set_trace()
 
-                # Validate token and return claims
-                return jwt.decode(
-                    access_token,
-                    key=key,
-                    algorithms=['RS256', 'RS384', 'RS512'],
-                    audience=audience,
-                    issuer=self.provider_config.issuer,
-                    options=options,
-                    leeway=config.get('ckanext.azure_auth.jwt_leeway', 0),
-                )
+        try:
+            # Select the correct signing key automatically using `kid`
+            signing_key = jwk_client.get_signing_key_from_jwt(id_token).key
 
-            except jwt.ExpiredSignatureError as error:
-                log.info(f'Signature has expired: {error}')
-                raise PermissionError
-            except jwt.DecodeError as error:
-                if idx < len(self.provider_config.signing_keys) - 1:
-                    continue
-                else:
-                    log.info(f'Error decoding signature: {error}')
-                    raise PermissionError
-            except jwt.InvalidTokenError as error:
-                log.info(str(error))
-                raise PermissionError
+            # Decode and validate token
+            claims = decode(
+                id_token,
+                key=signing_key,
+                algorithms=["RS256"],
+                audience=self.provider_config.client_id,
+                issuer=self.provider_config.issuer,
+                options={
+                    "require": ["exp", "iss", "aud", "nonce"],
+                    "verify_signature": True,
+                    "verify_exp": True,
+                    "verify_nbf": True,
+                    "verify_iat": True,
+                    "verify_aud": True,
+                    "verify_iss": True,
+                },
+                leeway=60  # allow 1 min clock skew
+            )
+
+        except InvalidTokenError as e:
+            log.info(f"ID token validation failed: {e}")
+            raise PermissionError("Invalid id_token")
+
+        # Validate nonce
+        expected_nonce = session.get(f"{ADFS_SESSION_PREFIX}nonce", 'defaultNonce')
+        if claims.get("nonce") != expected_nonce:
+            raise PermissionError("Invalid nonce in id_token")
+
+        # Validate policy / user flow (tfp claim)
+        token_policy = claims.get('acr') or claims.get('tfp')
+        if not token_policy:
+            log.warning("No policy claim found in token")
+        else:
+            # normalize case to avoid mismatch
+            if token_policy.lower() != self.provider_config.policy.lower():
+                raise PermissionError("ID token issued under wrong policy")
+
+        return claims
             
+    def execute_token_validation(self, id_token):
+        from flask import has_request_context, session
+
+        if has_request_context():
+            expected_nonce = session.get(f"{ADFS_SESSION_PREFIX}nonce")
+        else:
+            expected_nonce = None  # fallback for CLI/testing or non-request context
+
+        claims = self.validate_access_token(id_token, expected_nonce)
+
+        return claims
+    
     def get_or_create_user(self, claims):
         """
         Create or update a CKAN user from Azure B2C claims.
