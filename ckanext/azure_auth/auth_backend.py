@@ -318,8 +318,6 @@ class B2CAuthBackend(AdfsAuthBackend):
         # Use the JWKS URI from your provider config
         jwk_client = PyJWKClient(self.provider_config.jwks_uri)
 
-        import pdb; pdb.set_trace()
-
         try:
             # Select the correct signing key automatically using `kid`
             signing_key = jwk_client.get_signing_key_from_jwt(id_token).key
