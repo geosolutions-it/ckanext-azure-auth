@@ -270,14 +270,13 @@ class ProviderConfig(object):
 
 
 class B2CProviderConfig(ProviderConfig):
-    def __init__(self, service_domain, tenant_id, policy, client_id, redirect_uri, service_id=None, spidl='2'):
+    def __init__(self, service_domain, tenant_id, policy, client_id, redirect_uri, spidl='2'):
         super().__init__()
         self.service_domain = service_domain
         self.tenant_id = tenant_id
         self.policy = policy
         self.client_id = client_id
         self.redirect_uri = redirect_uri
-        self.service_id = service_id
         self.spidl = spidl
         self.session = requests.Session()
 
@@ -346,8 +345,6 @@ class B2CProviderConfig(ProviderConfig):
 
         if self.spidl:
             query['spidl'] = self.spidl
-        if self.service_id:
-            query['serviceId'] = self.service_id
 
         url = f"{self.authorization_endpoint}&{urlencode(query)}"
         log.info(f"B2C authorization URL: {url}")

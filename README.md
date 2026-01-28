@@ -137,9 +137,11 @@ And these settings:
 
     # Authentication level (spidl)
     ckanext.azure_auth.spidl = 1 # you can select between level 1, 2 or 3
-    ckanext.azure_auth.service_id = <..uuid..>
     # Definition of the user_id template
     ckanext.azure_auth.user_id_template="{extension_fiscalNumber}
+
+    # Allow plugin to create new users
+    ckanext.azure_auth.allow_create_users = True
 
 
 For the local environment you can setup callback url like that:
