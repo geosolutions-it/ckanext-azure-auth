@@ -123,7 +123,7 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
         return schema
 
     def get_helpers(self):
-        def is_adfs_user(user_id):
+        def is_azure_user(user_id):
             try:
                 user_dict = toolkit.get_action('user_show')(data_dict={'id': user_id})
                 
@@ -173,7 +173,7 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
             adfs_authentication_endpoint_error = str(err)
 
         return {
-            'is_adfs_user': is_adfs_user,
+            'is_azure_user': is_azure_user,
             'adfs_authentication_endpoint': adfs_authentication_endpoint,
             'adfs_authentication_endpoint_error': adfs_authentication_endpoint_error,
             'adfs_get_attrib': get_attrib,

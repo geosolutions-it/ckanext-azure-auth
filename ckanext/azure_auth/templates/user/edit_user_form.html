@@ -3,7 +3,7 @@
 {% block change_password %}
   {# If the helper returns True, this block renders nothing. #}
   {# If False, it renders the standard CKAN password fields. #}
-  {% if not h.is_adfs_user(data.id) %}
+  {% if not h.is_azure_user(data.id) %}
     {{ super() }}
   {% endif %}
 {% endblock %}
