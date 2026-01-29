@@ -1,12 +1,9 @@
 {% ckan_extends %}
 
 {% block change_password %}
-  {# Check if the user ID starts with the ADFS/Azure prefix #}
-  {% set is_adfs = h.is_adfs_user(data.id) if h.is_adfs_user else false %}
-
-  {# If it is NOT an ADFS user, show the standard password fields. #}
-  {# If it IS an ADFS user, this block is left empty as requested. #}
-  {% if not is_adfs %}
+  {# If the helper returns True, this block renders nothing. #}
+  {# If False, it renders the standard CKAN password fields. #}
+  {% if not h.is_adfs_user(data.id) %}
     {{ super() }}
   {% endif %}
 {% endblock %}

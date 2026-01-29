@@ -123,12 +123,14 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
         return schema
 
     def get_helpers(self):
-        def is_adfs_user(user_id: str):
-            # Get the auth service type
-            auth_service_type = ckan_config.get(ATTR_AUTH_SERVICE)
-            
-            user = toolkit.get_action('user_show')(data_dict={'id': user_id})
-            return user['id'].startswith(auth_service_type)
+        def is_adfs_user(user_id):
+            try:
+                user_dict = toolkit.get_action('user_show')(data_dict={'id': user_id})
+                
+                plugin_extras = user_dict.get('plugin_extras', {})
+                return 'azure_auth' in plugin_extras
+            except Exception:
+                return False
 
         def get_attrib(key):
             if key not in RENDERABLE_ATTRS:
