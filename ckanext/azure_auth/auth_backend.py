@@ -40,6 +40,27 @@ class AdfsAuthBackend(object):
     def __init__(self, provider_config):
         self.provider_config = provider_config
 
+    @staticmethod
+    def _get_fixed_user_schema():
+        """Returns the default user schema but with an optional password."""
+        # You need to ensure default_user_schema is imported at the top of the file
+        from ckan.logic.schema import default_user_schema
+        
+        schema = default_user_schema()
+        
+        ignore_missing = toolkit.get_validator('ignore_missing')
+        user_password_validator = toolkit.get_validator('user_password_validator')
+        user_password_not_empty = toolkit.get_validator('user_password_not_empty')
+        unicode_safe = toolkit.get_validator('unicode_safe')
+        
+        schema['password'] = [
+            ignore_missing, 
+            user_password_validator, 
+            user_password_not_empty, 
+            unicode_safe
+        ]
+        return schema
+    
     def exchange_auth_code(self, authorization_code):
         log.debug('Received authorization code: %s', authorization_code)
         data = {
@@ -139,7 +160,7 @@ class AdfsAuthBackend(object):
 
         log.debug(f'Decoded claims: {claims}')
         return self.get_or_create_user(claims)
-
+    
     def get_or_create_user(self, claims):
         '''
         Create the user if it doesn't exist yet
@@ -163,6 +184,12 @@ class AdfsAuthBackend(object):
         username = self.sanitize_username(claims.get('name', ckan_id))
         fullname = f'{claims["given_name"]} {claims["family_name"]}'
 
+        # Prepare the context once so we can reuse it
+        custom_context = {
+            "ignore_auth": True,
+            "schema": self._get_fixed_user_schema()
+        }
+        
         try:
             user = toolkit.get_action('user_show')(data_dict={'id': ckan_id})
             log.debug(f"User found --> {user}")
@@ -178,12 +205,12 @@ class AdfsAuthBackend(object):
                 # set some fields required when saving
                 user['email'] = email
                 toolkit.get_action('user_update')(
-                    context={'ignore_auth': True},
+                    context=custom_context,
                     data_dict=user)
         except NotFound:
             if config[ATTR_CREATE_USER]:
                 user = toolkit.get_action('user_create')(
-                    context={'ignore_auth': True},
+                    context=custom_context,
                     data_dict={
                         'id': ckan_id,
                         'name': username,
@@ -407,6 +434,12 @@ class B2CAuthBackend(AdfsAuthBackend):
         if not fullname:
             fullname = username
 
+        # Prepare the context once so we can reuse it
+        custom_context = {
+            "ignore_auth": True,
+            "schema": self._get_fixed_user_schema()
+        }
+
         try:
             user = get_action("user_show")(
                 {"ignore_auth": True},
@@ -422,15 +455,12 @@ class B2CAuthBackend(AdfsAuthBackend):
                 dirty = True
 
             if dirty:
-                get_action("user_update")(
-                    {"ignore_auth": True},
-                    user
-                )
+                get_action("user_update")(custom_context, user)
 
         except NotFound:
             if asbool(config.get(ATTR_CREATE_USER, False)):
                 user = get_action("user_create")(
-                    {"ignore_auth": True},
+                    custom_context,
                     {
                         "name": username,
                         "fullname": fullname,
