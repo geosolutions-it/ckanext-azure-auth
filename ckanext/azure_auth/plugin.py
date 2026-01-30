@@ -1,6 +1,7 @@
 import logging
 import requests
 
+from ckan import model
 from ckan.logic import get_action, NotAuthorized
 from ckan.common import g, session
 from ckan.common import config as ckan_config
@@ -124,11 +125,16 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
 
     def get_helpers(self):
         def is_azure_user(user_id):
-            try:
-                user_dict = toolkit.get_action('user_show')(data_dict={'id': user_id})
+            """
+            Checks if a user is managed by Azure/ADFS.
+            'user_id' can be the UUID or the username.
+            """
+            if not user_id:
+                return False
                 
-                plugin_extras = user_dict.get('plugin_extras', {})
-                return 'azure_auth' in plugin_extras
+            try:
+                user_obj = model.User.get(user_id)
+                return user_obj and 'azure_auth' in user_obj.plugin_extras
             except Exception:
                 return False
 
@@ -136,7 +142,7 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
             if key not in RENDERABLE_ATTRS:
                 raise NotAuthorized('Attribute is not accessible')
             return get_action('config_option_show')({'ignore_auth': True}, {'key': key})
-
+        
         try:
             mode = ckan_config.get(ATTR_MODE)
             service_domain = ckan_config.get(ATTR_SERVICE_DOMAIN)
