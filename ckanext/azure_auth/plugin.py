@@ -36,6 +36,7 @@ from ckanext.azure_auth.auth_config import (
 )
 
 from ckanext.azure_auth.blueprint import azure_auth_blueprint, azure_admin_blueprint, get_auth_backend
+from ckanext.azure_auth.logic.action import azure_user_create
 
 log = logging.getLogger(__name__)
 requests.packages.urllib3.add_stderr_logger()
@@ -50,6 +51,13 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
     plugins.implements(plugins.IConfigurer)
     plugins.implements(plugins.ITemplateHelpers)
     plugins.implements(plugins.IAuthenticator)
+    plugins.implements(plugins.IActions)
+
+    def get_actions(self):
+        # Run the custom user_create function"
+        return {
+            'user_create': azure_user_create
+        }
 
     def update_config(self, config):
         '''

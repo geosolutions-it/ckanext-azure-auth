@@ -188,7 +188,6 @@ class AdfsAuthBackend(object):
                         'id': ckan_id,
                         'name': username,
                         'fullname': fullname,
-                        'password': str(uuid.uuid4()),
                         'email': email,
                         'plugin_extras': {
                             'azure_auth':  user_id,
@@ -436,7 +435,6 @@ class B2CAuthBackend(AdfsAuthBackend):
                         "name": username,
                         "fullname": fullname,
                         "email": email,
-                        "password": str(uuid.uuid4()),
                         "plugin_extras": {
                             "azure_auth": external_id
                         }
