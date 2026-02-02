@@ -122,15 +122,21 @@ def token_login():
         
         return "", 200
     
-    except CreateUserException as e:
-        log.warning(f"Login failed: {str(e)}")
-        flash(str(e), 'error')  # store message in session to potentially show in frontend
-        return redirect(url_for('user.login'))
-
     except Exception as e:
-        log.exception("Failed to process id_token")
-        flash("Unexpected login error", 'error')
-        return redirect(url_for('user.login'))
+        log.exception("Azure Login process failed")
+        
+        # Determine the message to show the user
+        if isinstance(e, CreateUserException):
+            # Use the specific message from your custom exception
+            user_msg = str(e)
+        else:
+            user_msg = "An unexpected error occurred during login."
+            
+        # Flash it for the next page load
+        flash(user_msg, 'error')
+        
+        # Return 400 to trigger the JS redirect
+        return "Login Error", 400
 
 @azure_auth_blueprint.route('/user/_logout')
 def logout():
