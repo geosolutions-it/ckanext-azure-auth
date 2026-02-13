@@ -1,5 +1,5 @@
 '''
-Plugin for ADFS authentication
+Plugin for ADFS and B2C authentication
 '''
 import base64
 import logging
@@ -8,10 +8,14 @@ import requests
 
 import ckan.plugins.toolkit as toolkit
 from ckan.common import _, g, request, session
+from ckan.common import config
 from ckan.lib import base, helpers
 from ckan.model import State
 from ckanext.azure_auth.auth_backend import AdfsAuthBackend
-from ckanext.azure_auth.auth_config import ADFS_SESSION_PREFIX, ProviderConfig
+from ckanext.azure_auth.auth_config import (
+    ADFS_SESSION_PREFIX, 
+    ProviderConfig, 
+)
 from ckanext.azure_auth.exceptions import (
     AzureReloginRequiredException,
     CreateUserException,
@@ -24,10 +28,18 @@ requests.packages.urllib3.add_stderr_logger()
 
 
 def login_callback():
-    '''
-    Handles ADFS callback
-    received auth code or auth tokens
-    '''
+    """
+    Handle login callback for both Azure B2C (implicit flow) and classic ADFS (authorization code flow).
+    """
+
+    mode = config.get('ckanext.azure_auth.mode')
+
+    # B2C implicit flow
+    if mode == "b2c":
+        # Just render the page with JS that posts id_token to /azure/token
+        return base.render('user/get_token.html')
+
+    # Classic ADFS code flow
     code = request.params.get('code')
     provider_config = ProviderConfig()
     auth_backend = AdfsAuthBackend(provider_config=provider_config)

@@ -1,5 +1,7 @@
 import base64
 import logging
+import json
+import jwt
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
 from xml.etree import ElementTree
@@ -17,10 +19,11 @@ _EXTNAME = 'ckanext.azure_auth'
 
 AZURE_AD_SERVER_URL = 'https://login.microsoftonline.com'
 
-AUTH_SERVICE = 'adfs'
 ADFS_SESSION_PREFIX = 'adfs-'
 
 # Config keys
+ATTR_AUTH_SERVICE = f'{_EXTNAME}.auth_service_type'
+ATTR_MODE = f'{_EXTNAME}.mode'
 ATTR_AD_SERVER = f'{_EXTNAME}.ad_server'
 ATTR_WT_REALM = f'{_EXTNAME}.wtrealm'
 ATTR_METADATA_URL = f'{_EXTNAME}.metadata_url'
@@ -28,14 +31,19 @@ ATTR_HELP_TEXT = f'{_EXTNAME}.login_help_text'
 ATTR_AUTH_CALLBACK_PATH = f'{_EXTNAME}.auth_callback_path'
 ATTR_TENANT_ID = f'{_EXTNAME}.tenant_id'
 ATTR_CLIENT_ID = f'{_EXTNAME}.client_id'
+ATTR_SERVICE_DOMAIN = f'{_EXTNAME}.service_domain'
 ATTR_ADSF_AUDIENCE = f'{_EXTNAME}.audience'
 ATTR_CLIENT_SECRET = f'{_EXTNAME}.client_secret'
 ATTR_FORCE_MFA = f'{_EXTNAME}.force_mfa'
 ATTR_DISABLE_SSO = f'{_EXTNAME}.disable_sso'
+ATTR_USER_ID_TEMPLATE = f'{_EXTNAME}.user_id_template'
+
+#SPID level
+ATTR_SPIDL = f'{_EXTNAME}.spidl'
 
 # Config keys: Configured at runtime
 ATTR_REDIRECT_URL = f'{_EXTNAME}.redirect_uri'
-ADFS_CREATE_USER = f'{_EXTNAME}.allow_create_users'
+ATTR_CREATE_USER = f'{_EXTNAME}.allow_create_users'
 
 ATTR_LOGIN_LABEL = f'{_EXTNAME}.login_label'
 ATTR_LOGIN_BUTTON = f'{_EXTNAME}.login_button'
@@ -259,3 +267,112 @@ class ProviderConfig(object):
         '''
         self.load_config()
         return self.end_session_endpoint
+
+
+class B2CProviderConfig(ProviderConfig):
+    def __init__(self, service_domain, tenant_id, policy, client_id, redirect_uri, spidl='2'):
+        super().__init__()
+        self.service_domain = service_domain
+        self.tenant_id = tenant_id
+        self.policy = policy
+        self.client_id = client_id
+        self.redirect_uri = redirect_uri
+        self.spidl = spidl
+        self.session = requests.Session()
+
+        # endpoints / issuer / jwks_uri will be set in load_config
+        self.authorization_endpoint = None
+        self.token_endpoint = None
+        self.end_session_endpoint = None
+        self.issuer = None
+        self.jwks_uri = None
+
+    def load_config(self):
+        """
+        Load OpenID Connect configuration from Azure B2C (MyIdentity)
+        """
+        # Use the exact URL from the docs
+        config_url = (
+            f"https://{self.service_domain}/"
+            f"{self.tenant_id}/v2.0/.well-known/openid-configuration?p={self.policy}"
+        )
+
+        resp = self.session.get(config_url, timeout=120)
+        resp.raise_for_status()
+        cfg = resp.json()
+
+        # Set endpoints
+        self.authorization_endpoint = cfg['authorization_endpoint']  # will be like .../oauth2/v2.0/authorize
+        self.token_endpoint = cfg['token_endpoint']
+        self.end_session_endpoint = cfg.get('end_session_endpoint')
+        self.issuer = cfg['issuer']
+
+        # Store the JWKS URI — this is all you need for PyJWKClient
+        self.jwks_uri = cfg['jwks_uri']
+
+    def build_authorization_endpoint(self, redirect_to_path='/'):
+        """
+        Build the authorization URL for B2C login.
+        """
+
+        # Ensure config loaded
+        self.load_config()
+
+        state = base64.urlsafe_b64encode(redirect_to_path.encode()).decode()
+        
+        # Do NOT add 'p' again! Already included in authorization_endpoint
+        query = {
+            'client_id': self.client_id,
+            'redirect_uri': self.redirect_uri,
+            'response_type': 'id_token',
+            'scope': 'openid',
+            'state': state,
+            'prompt': 'login',
+        }
+
+        from flask import has_request_context, session
+        import secrets
+
+        if has_request_context():
+            nonce = secrets.token_urlsafe(16)
+            session[f"{ADFS_SESSION_PREFIX}nonce"] = nonce
+        else:
+            # fallback: static nonce (for non-request situations)
+            nonce = 'defaultNonce'
+        
+        # Add dynamic or static nonce in the query
+        query['nonce'] = nonce
+
+        if self.spidl:
+            query['spidl'] = self.spidl
+
+        url = f"{self.authorization_endpoint}&{urlencode(query)}"
+        log.info(f"B2C authorization URL: {url}")
+        return url
+    
+    def build_logout_endpoint(self):
+        """
+        Constructs the B2C logout URL dynamically.
+        """
+        if not self.end_session_endpoint:
+            self.load_config()
+
+        # The post_logout_redirect_uri MUST be registered in the Azure Portal
+        post_logout_uri = config.get('ckan.site_url').rstrip('/')
+        
+        params = {
+            'post_logout_redirect_uri': post_logout_uri
+        }
+
+        # IMPORTANT: Including the id_token_hint makes logout much more reliable,
+        # especially for federated providers like SPID.
+        from flask import session as flask_session
+        id_token = flask_session.get(f'{ADFS_SESSION_PREFIX}id_token')
+        if id_token:
+            params['id_token_hint'] = id_token
+        
+        # Safely check if we need a '?' or an '&'
+        separator = '&' if '?' in self.end_session_endpoint else '?'
+        
+        # Construct the final URL
+        return f"{self.end_session_endpoint}{separator}{urlencode(params)}"

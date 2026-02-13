@@ -1,10 +1,19 @@
 # encoding: utf-8
 from functools import partial
+import logging
 
-from flask import Blueprint, request
+from flask import (
+    Blueprint,
+    request, 
+    session, 
+    url_for, 
+    flash, 
+    redirect,
+    )
+from ckan.plugins import toolkit
 
 from ckan import logic
-from ckan.common import config, g, _
+from ckan.common import config, g, _, c
 import ckan.lib.base as base
 import ckan.lib.helpers as helpers
 from ckan.logic import get_action
@@ -15,7 +24,14 @@ from ckanext.azure_auth.auth_config import (
     ATTR_AUTH_CALLBACK_PATH,
     ATTR_LOGIN_LABEL,
     ATTR_LOGIN_BUTTON,
+    ADFS_SESSION_PREFIX
 )
+from ckanext.azure_auth.auth_backend import B2CAuthBackend
+from ckanext.azure_auth.auth_config import B2CProviderConfig
+from ckanext.azure_auth.exceptions import CreateUserException
+
+# Initialize logger
+log = logging.getLogger(__name__)
 
 azure_admin_blueprint = Blueprint(u'azure_admin', __name__)
 
@@ -23,6 +39,27 @@ azure_admin_blueprint = Blueprint(u'azure_admin', __name__)
 def build_extra_admin_nav():
     u'''Return results of helpers.build_extra_admin_nav for testing.'''
     return helpers.build_extra_admin_nav()
+
+def get_auth_backend():
+    tenant_id = config.get('ckanext.azure_auth.tenant_id')
+    client_id = config.get('ckanext.azure_auth.client_id')
+    service_domain = config.get('ckanext.azure_auth.service_domain')
+    policy = config.get('ckanext.azure_auth.policy')
+    redirect_uri = config.get('ckanext.azure_auth.redirect_uri')
+    spidl = config.get('ckanext.azure_auth.spidl')
+
+    provider_config = B2CProviderConfig(
+        service_domain=service_domain,
+        tenant_id=tenant_id,
+        policy=policy,
+        client_id=client_id,
+        redirect_uri=redirect_uri,
+        spidl = spidl,
+    )
+
+    provider_config.load_config()
+
+    return B2CAuthBackend(provider_config=provider_config)
 
 
 azure_admin_blueprint.add_url_rule(
@@ -61,8 +98,64 @@ def azure_auth_config():
             'title': u'ADFS configuration'}
     )
 
-
 azure_auth_blueprint = Blueprint(u'azure_auth', __name__)
+
+@azure_auth_blueprint.route('/azure/token', methods=['POST'])
+def token_login():
+    data = request.get_json()
+    id_token = data.get('id_token')
+    
+    try:
+        auth_backend = get_auth_backend()
+        user_dict = auth_backend.process_access_token(id_token)
+        
+        # Get the CKAN User object
+        user_obj = model.User.get(user_dict['name'])
+        if not user_obj:
+            return "User not found", 404
+
+        # Log in CKAN properly
+        toolkit.login_user(user_obj)
+
+        session[f'{ADFS_SESSION_PREFIX}user'] = user_dict['name']
+        session.save()
+        
+        return "", 200
+    
+    except Exception as e:
+        log.exception("Azure Login process failed")
+        
+        # Determine the message to show the user
+        if isinstance(e, CreateUserException):
+            # Use the specific message from your custom exception
+            user_msg = str(e)
+        else:
+            user_msg = "An unexpected error occurred during login."
+            
+        # Flash it for the next page load
+        flash(user_msg, 'error')
+        
+        # Return 400 to trigger the JS redirect
+        return "Login Error", 400
+
+@azure_auth_blueprint.route('/user/_logout')
+def logout():
+    userobj = getattr(g, 'userobj', None)
+
+    if userobj and userobj.name.startswith(('adfs-', 'b2c-')):
+        log.info(f"Azure user detected: {userobj.name}. Performing Azure logout.")
+
+        # Logout CKAN session
+        toolkit.logout_user()
+
+        # Redirect to Azure logout
+        backend = get_auth_backend()
+        azure_logout_url = backend.provider_config.build_logout_endpoint()
+        return toolkit.redirect_to(azure_logout_url)
+
+    # For local CKAN users
+    toolkit.logout_user()
+    return toolkit.redirect_to('/')
 
 azure_auth_blueprint.add_url_rule(
     rule=config[ATTR_AUTH_CALLBACK_PATH],

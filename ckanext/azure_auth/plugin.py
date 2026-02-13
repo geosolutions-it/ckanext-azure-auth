@@ -1,15 +1,18 @@
 import logging
 import requests
 
+from ckan import model
 from ckan.logic import get_action, NotAuthorized
 from ckan.common import g, session
+from ckan.common import config as ckan_config
 from ckan.exceptions import CkanConfigurationException
 import ckan.plugins as plugins
 import ckan.plugins.toolkit as toolkit
 
 from ckanext.azure_auth.auth_config import (
-    AUTH_SERVICE,
-    ADFS_CREATE_USER,
+    ATTR_MODE,
+    ATTR_AUTH_SERVICE,
+    ATTR_CREATE_USER,
     ADFS_SESSION_PREFIX,
     ATTR_ADSF_AUDIENCE,
     ATTR_AD_SERVER,
@@ -22,14 +25,17 @@ from ckanext.azure_auth.auth_config import (
     ATTR_METADATA_URL,
     ATTR_REDIRECT_URL,
     ATTR_TENANT_ID,
+    ATTR_SERVICE_DOMAIN,
     ATTR_WT_REALM,
     AZURE_AD_SERVER_URL,
     ATTR_LOGIN_LABEL, ATTR_LOGIN_BUTTON,
     ProviderConfig,
     RENDERABLE_ATTRS,
+    B2CProviderConfig,
+    ATTR_SPIDL,
 )
 
-from ckanext.azure_auth.blueprint import azure_auth_blueprint, azure_admin_blueprint
+from ckanext.azure_auth.blueprint import azure_auth_blueprint, azure_admin_blueprint, get_auth_backend
 
 log = logging.getLogger(__name__)
 requests.packages.urllib3.add_stderr_logger()
@@ -118,29 +124,62 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
         return schema
 
     def get_helpers(self):
-
-        def is_adfs_user(user_id: str):
-            user = toolkit.get_action('user_show')(data_dict={'id': user_id})
-            return user['id'].startswith(AUTH_SERVICE)
+        def is_azure_user(user_id):
+            """
+            Checks if a user is managed by Azure/ADFS.
+            'user_id' can be the UUID or the username.
+            """
+            if not user_id:
+                return False
+                
+            try:
+                user_obj = model.User.get(user_id)
+                return user_obj and 'azure_auth' in user_obj.plugin_extras
+            except Exception:
+                return False
 
         def get_attrib(key):
             if key not in RENDERABLE_ATTRS:
                 raise NotAuthorized('Attribute is not accessible')
             return get_action('config_option_show')({'ignore_auth': True}, {'key': key})
-
+        
         try:
-            provider_config = ProviderConfig()
+            mode = ckan_config.get(ATTR_MODE)
+            service_domain = ckan_config.get(ATTR_SERVICE_DOMAIN)
+            tenant_id = ckan_config.get(ATTR_TENANT_ID)
+            client_id = ckan_config.get(ATTR_CLIENT_ID)
+            redirect_uri = ckan_config.get(ATTR_REDIRECT_URL)
+            spidl = ckan_config.get(ATTR_SPIDL)
+
+            if mode == 'b2c':
+                # Azure B2C / MyIdentity mode
+                policy = ckan_config.get('ckanext.azure_auth.policy')
+                provider_config = B2CProviderConfig(
+                    service_domain = service_domain,
+                    tenant_id=tenant_id,
+                    policy=policy,
+                    client_id=client_id,
+                    redirect_uri=redirect_uri,
+                    spidl=spidl,
+                )
+            else:
+                # Classic ADFS mode
+                provider_config = ProviderConfig()
+
+            # Load endpoints
+            provider_config.load_config()
+
+            # --- FIX: return the actual string, not a lambda ---
             adfs_authentication_endpoint_error = ''
-            adfs_authentication_endpoint = (
-                provider_config.build_authorization_endpoint()
-            )
+            adfs_authentication_endpoint = provider_config.build_authorization_endpoint()
+
         except RuntimeError as err:
             log.critical(err)
             adfs_authentication_endpoint = False
             adfs_authentication_endpoint_error = str(err)
 
         return {
-            'is_adfs_user': is_adfs_user,
+            'is_azure_user': is_azure_user,
             'adfs_authentication_endpoint': adfs_authentication_endpoint,
             'adfs_authentication_endpoint_error': adfs_authentication_endpoint_error,
             'adfs_get_attrib': get_attrib,
@@ -176,3 +215,11 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
 
     def abort(self, status_code, detail, headers, comment):
         return status_code, detail, headers, comment
+    
+    # IAuthenticator
+    def authenticate(self, identity):
+        """
+        Do not handle username/password authentication.
+        Let CKAN's built-in authenticator handle local users.
+        """
+        return None

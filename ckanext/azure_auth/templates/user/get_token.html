@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Azure Login Callback</title>
+</head>
+<body>
+<script>
+(function() {
+    // Check if the URL fragment contains id_token
+    const hash = window.location.hash.substr(1); // remove '#'
+    const params = new URLSearchParams(hash);
+    const id_token = params.get('id_token');
+
+    if (id_token) {
+        fetch('/azure/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id_token })
+        }).then(resp => {
+            if (resp.ok) {
+                // Success: Clean up URL and go to home
+                window.history.replaceState({}, document.title, '/');
+                window.location.href = '/'; 
+            } else {
+                // ERROR: The backend returned 400 or 500.
+                // We force the browser to redirect to the login page.
+                console.error('Login failed on server');
+                window.location.href = '/user/login';
+            }
+        }).catch(err => {
+            // NETWORK ERROR: (e.g., timeout or blocked redirect)
+            console.error('Fetch error:', err);
+            window.location.href = '/user/login';
+        });
+    } else {
+        // No token found in hash, go back to login
+        window.location.href = '/user/login';
+    }
+})();
+</script>
+</body>
+</html>
