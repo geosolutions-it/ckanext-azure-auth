@@ -21,7 +21,6 @@ setup(
         # -*- Extra requirements: -*-
         'xml_python',
         'pyjwt',
-        'm2crypto',
     ],
     entry_points="""
         [ckan.plugins]
