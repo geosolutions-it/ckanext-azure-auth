@@ -32,11 +32,13 @@ ATTR_AUTH_CALLBACK_PATH = f'{_EXTNAME}.auth_callback_path'
 ATTR_TENANT_ID = f'{_EXTNAME}.tenant_id'
 ATTR_CLIENT_ID = f'{_EXTNAME}.client_id'
 ATTR_SERVICE_DOMAIN = f'{_EXTNAME}.service_domain'
+ATTR_SERVICE_ID = f'{_EXTNAME}.service_id'
 ATTR_ADSF_AUDIENCE = f'{_EXTNAME}.audience'
 ATTR_CLIENT_SECRET = f'{_EXTNAME}.client_secret'
 ATTR_FORCE_MFA = f'{_EXTNAME}.force_mfa'
 ATTR_DISABLE_SSO = f'{_EXTNAME}.disable_sso'
 ATTR_USER_ID_TEMPLATE = f'{_EXTNAME}.user_id_template'
+ATTR_POLICY = f'{_EXTNAME}.policy'
 
 #SPID level
 ATTR_SPIDL = f'{_EXTNAME}.spidl'
@@ -270,9 +272,10 @@ class ProviderConfig(object):
 
 
 class B2CProviderConfig(ProviderConfig):
-    def __init__(self, service_domain, tenant_id, policy, client_id, redirect_uri, spidl='2'):
+    def __init__(self, service_domain, service_id, tenant_id, policy, client_id, redirect_uri, spidl='2'):
         super().__init__()
         self.service_domain = service_domain
+        self.service_id = service_id
         self.tenant_id = tenant_id
         self.policy = policy
         self.client_id = client_id
@@ -319,7 +322,7 @@ class B2CProviderConfig(ProviderConfig):
         self.load_config()
 
         state = base64.urlsafe_b64encode(redirect_to_path.encode()).decode()
-        
+
         # Do NOT add 'p' again! Already included in authorization_endpoint
         query = {
             'client_id': self.client_id,
@@ -329,6 +332,8 @@ class B2CProviderConfig(ProviderConfig):
             'state': state,
             'prompt': 'login',
         }
+        if self.service_id:
+            query['serviceId'] = self.service_id
 
         from flask import has_request_context, session
         import secrets
@@ -339,7 +344,7 @@ class B2CProviderConfig(ProviderConfig):
         else:
             # fallback: static nonce (for non-request situations)
             nonce = 'defaultNonce'
-        
+
         # Add dynamic or static nonce in the query
         query['nonce'] = nonce
 
@@ -349,7 +354,7 @@ class B2CProviderConfig(ProviderConfig):
         url = f"{self.authorization_endpoint}&{urlencode(query)}"
         log.info(f"B2C authorization URL: {url}")
         return url
-    
+
     def build_logout_endpoint(self):
         """
         Constructs the B2C logout URL dynamically.
@@ -359,7 +364,7 @@ class B2CProviderConfig(ProviderConfig):
 
         # The post_logout_redirect_uri MUST be registered in the Azure Portal
         post_logout_uri = config.get('ckan.site_url').rstrip('/')
-        
+
         params = {
             'post_logout_redirect_uri': post_logout_uri
         }
@@ -370,9 +375,9 @@ class B2CProviderConfig(ProviderConfig):
         id_token = flask_session.get(f'{ADFS_SESSION_PREFIX}id_token')
         if id_token:
             params['id_token_hint'] = id_token
-        
+
         # Safely check if we need a '?' or an '&'
         separator = '&' if '?' in self.end_session_endpoint else '?'
-        
+
         # Construct the final URL
         return f"{self.end_session_endpoint}{separator}{urlencode(params)}"

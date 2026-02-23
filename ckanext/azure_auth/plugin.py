@@ -32,7 +32,7 @@ from ckanext.azure_auth.auth_config import (
     ProviderConfig,
     RENDERABLE_ATTRS,
     B2CProviderConfig,
-    ATTR_SPIDL,
+    ATTR_SPIDL, ATTR_SERVICE_ID, ATTR_POLICY,
 )
 
 from ckanext.azure_auth.blueprint import azure_auth_blueprint, azure_admin_blueprint, get_auth_backend
@@ -131,7 +131,7 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
             """
             if not user_id:
                 return False
-                
+
             try:
                 user_obj = model.User.get(user_id)
                 return user_obj and 'azure_auth' in user_obj.plugin_extras
@@ -142,25 +142,20 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
             if key not in RENDERABLE_ATTRS:
                 raise NotAuthorized('Attribute is not accessible')
             return get_action('config_option_show')({'ignore_auth': True}, {'key': key})
-        
+
         try:
             mode = ckan_config.get(ATTR_MODE)
-            service_domain = ckan_config.get(ATTR_SERVICE_DOMAIN)
-            tenant_id = ckan_config.get(ATTR_TENANT_ID)
-            client_id = ckan_config.get(ATTR_CLIENT_ID)
-            redirect_uri = ckan_config.get(ATTR_REDIRECT_URL)
-            spidl = ckan_config.get(ATTR_SPIDL)
 
             if mode == 'b2c':
                 # Azure B2C / MyIdentity mode
-                policy = ckan_config.get('ckanext.azure_auth.policy')
                 provider_config = B2CProviderConfig(
-                    service_domain = service_domain,
-                    tenant_id=tenant_id,
-                    policy=policy,
-                    client_id=client_id,
-                    redirect_uri=redirect_uri,
-                    spidl=spidl,
+                    service_domain = ckan_config.get(ATTR_SERVICE_DOMAIN),
+                    service_id = ckan_config.get(ATTR_SERVICE_ID),
+                    tenant_id = ckan_config.get(ATTR_TENANT_ID),
+                    policy = ckan_config.get(ATTR_POLICY),
+                    client_id = ckan_config.get(ATTR_CLIENT_ID),
+                    redirect_uri = ckan_config.get(ATTR_REDIRECT_URL),
+                    spidl = ckan_config.get(ATTR_SPIDL),
                 )
             else:
                 # Classic ADFS mode
@@ -215,7 +210,7 @@ class AzureAuthPlugin(plugins.SingletonPlugin):
 
     def abort(self, status_code, detail, headers, comment):
         return status_code, detail, headers, comment
-    
+
     # IAuthenticator
     def authenticate(self, identity):
         """

@@ -4,11 +4,9 @@ import logging
 
 from flask import (
     Blueprint,
-    request, 
-    session, 
-    url_for, 
-    flash, 
-    redirect,
+    request,
+    session,
+    flash,
     )
 from ckan.plugins import toolkit
 
@@ -24,7 +22,8 @@ from ckanext.azure_auth.auth_config import (
     ATTR_AUTH_CALLBACK_PATH,
     ATTR_LOGIN_LABEL,
     ATTR_LOGIN_BUTTON,
-    ADFS_SESSION_PREFIX
+    ADFS_SESSION_PREFIX, ATTR_TENANT_ID, ATTR_CLIENT_ID, ATTR_SERVICE_DOMAIN, ATTR_POLICY, ATTR_REDIRECT_URL,
+    ATTR_SPIDL, ATTR_SERVICE_ID
 )
 from ckanext.azure_auth.auth_backend import B2CAuthBackend
 from ckanext.azure_auth.auth_config import B2CProviderConfig
@@ -41,15 +40,17 @@ def build_extra_admin_nav():
     return helpers.build_extra_admin_nav()
 
 def get_auth_backend():
-    tenant_id = config.get('ckanext.azure_auth.tenant_id')
-    client_id = config.get('ckanext.azure_auth.client_id')
-    service_domain = config.get('ckanext.azure_auth.service_domain')
-    policy = config.get('ckanext.azure_auth.policy')
-    redirect_uri = config.get('ckanext.azure_auth.redirect_uri')
-    spidl = config.get('ckanext.azure_auth.spidl')
+    tenant_id = config.get(ATTR_TENANT_ID)
+    client_id = config.get(ATTR_CLIENT_ID)
+    service_domain = config.get(ATTR_SERVICE_DOMAIN)
+    service_id = config.get(ATTR_SERVICE_ID)
+    policy = config.get(ATTR_POLICY)
+    redirect_uri = config.get(ATTR_REDIRECT_URL)
+    spidl = config.get(ATTR_SPIDL)
 
     provider_config = B2CProviderConfig(
         service_domain=service_domain,
+        service_id=service_id,
         tenant_id=tenant_id,
         policy=policy,
         client_id=client_id,
@@ -104,11 +105,11 @@ azure_auth_blueprint = Blueprint(u'azure_auth', __name__)
 def token_login():
     data = request.get_json()
     id_token = data.get('id_token')
-    
+
     try:
         auth_backend = get_auth_backend()
         user_dict = auth_backend.process_access_token(id_token)
-        
+
         # Get the CKAN User object
         user_obj = model.User.get(user_dict['name'])
         if not user_obj:
@@ -119,22 +120,22 @@ def token_login():
 
         session[f'{ADFS_SESSION_PREFIX}user'] = user_dict['name']
         session.save()
-        
+
         return "", 200
-    
+
     except Exception as e:
         log.exception("Azure Login process failed")
-        
+
         # Determine the message to show the user
         if isinstance(e, CreateUserException):
             # Use the specific message from your custom exception
             user_msg = str(e)
         else:
             user_msg = "An unexpected error occurred during login."
-            
+
         # Flash it for the next page load
         flash(user_msg, 'error')
-        
+
         # Return 400 to trigger the JS redirect
         return "Login Error", 400
 

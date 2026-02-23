@@ -45,22 +45,22 @@ class AdfsAuthBackend(object):
         """Returns the default user schema but with an optional password."""
         # You need to ensure default_user_schema is imported at the top of the file
         from ckan.logic.schema import default_user_schema
-        
+
         schema = default_user_schema()
-        
+
         ignore_missing = toolkit.get_validator('ignore_missing')
         user_password_validator = toolkit.get_validator('user_password_validator')
         user_password_not_empty = toolkit.get_validator('user_password_not_empty')
         unicode_safe = toolkit.get_validator('unicode_safe')
-        
+
         schema['password'] = [
-            ignore_missing, 
-            user_password_validator, 
-            user_password_not_empty, 
+            ignore_missing,
+            user_password_validator,
+            user_password_not_empty,
             unicode_safe
         ]
         return schema
-    
+
     def exchange_auth_code(self, authorization_code):
         log.debug('Received authorization code: %s', authorization_code)
         data = {
@@ -160,7 +160,7 @@ class AdfsAuthBackend(object):
 
         log.debug(f'Decoded claims: {claims}')
         return self.get_or_create_user(claims)
-    
+
     def get_or_create_user(self, claims):
         '''
         Create the user if it doesn't exist yet
@@ -189,7 +189,7 @@ class AdfsAuthBackend(object):
             "ignore_auth": True,
             "schema": self._get_fixed_user_schema()
         }
-        
+
         try:
             user = toolkit.get_action('user_show')(data_dict={'id': ckan_id})
             log.debug(f"User found --> {user}")
@@ -298,7 +298,7 @@ class B2CAuthBackend(AdfsAuthBackend):
 
         # Validate and decode the token
         claims = self.execute_token_validation(id_token)
-        
+
         if not claims:
             raise PermissionError("Invalid id_token")
 
@@ -306,7 +306,7 @@ class B2CAuthBackend(AdfsAuthBackend):
 
         # Get or create CKAN user from token claims
         return self.get_or_create_user(claims)
-    
+
     def authenticate_with_id_token(self, id_token: str):
         """
         Authenticate a user using the id_token returned by Azure B2C implicit flow.
@@ -320,7 +320,7 @@ class B2CAuthBackend(AdfsAuthBackend):
 
         # Start token validation process
         claims = self.execute_token_validation(id_token)
-        
+
         if not claims:
             raise PermissionError("Invalid id_token received")
 
@@ -329,7 +329,7 @@ class B2CAuthBackend(AdfsAuthBackend):
         # Create or update the CKAN user based on claims
         user = self.get_or_create_user(claims)
         return user
-    
+
     def validate_access_token(self, id_token: str, expected_nonce: str):
         """
         Fully compliant Azure B2C ID token validation using PyJWKClient.
@@ -386,7 +386,7 @@ class B2CAuthBackend(AdfsAuthBackend):
                 raise PermissionError("ID token issued under wrong policy")
 
         return claims
-            
+
     def execute_token_validation(self, id_token):
         from flask import has_request_context, session
 
@@ -398,7 +398,7 @@ class B2CAuthBackend(AdfsAuthBackend):
         claims = self.validate_access_token(id_token, expected_nonce)
 
         return claims
-    
+
     def get_or_create_user(self, claims):
         """
         Create or update a CKAN user from Azure B2C claims.
@@ -409,9 +409,8 @@ class B2CAuthBackend(AdfsAuthBackend):
         Returns:
             dict: CKAN user dict
         """
-        
+
         # Get the auth service type and the user id template
-        auth_service_type = config.get(ATTR_AUTH_SERVICE)
         user_id_template = config.get(ATTR_USER_ID_TEMPLATE)
 
         if not user_id_template:
@@ -423,7 +422,7 @@ class B2CAuthBackend(AdfsAuthBackend):
         except KeyError as e:
             log.error(f"Missing required claim {e}")
             raise PermissionError
-        
+
         email = claims.get("email")
         if not email:
             raise PermissionError("Missing email claim")
