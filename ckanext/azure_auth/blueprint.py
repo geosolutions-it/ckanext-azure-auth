@@ -8,6 +8,8 @@ from flask import (
     session,
     flash,
     )
+
+from ckan.lib.helpers import flash_error
 from ckan.plugins import toolkit
 
 from ckan import logic
@@ -101,19 +103,21 @@ def azure_auth_config():
 
 azure_auth_blueprint = Blueprint(u'azure_auth', __name__)
 
-@azure_auth_blueprint.route('/azure/token', methods=['POST'])
+@azure_auth_blueprint.route('/azure/login', methods=['POST'], endpoint='login')
 def token_login():
-    data = request.get_json()
-    id_token = data.get('id_token')
-
     try:
-        auth_backend = get_auth_backend()
-        user_dict = auth_backend.process_access_token(id_token)
+        id_token = request.form.get('id_token')
+        if not id_token:
+            flash_error("No token found")
+            return base.render("user/login.html")
+
+        user_dict = get_auth_backend().process_access_token(id_token)
 
         # Get the CKAN User object
         user_obj = model.User.get(user_dict['name'])
         if not user_obj:
-            return "User not found", 404
+            flash_error("User not found")
+            return base.render("user/login.html")
 
         # Log in CKAN properly
         toolkit.login_user(user_obj)
@@ -121,30 +125,21 @@ def token_login():
         session[f'{ADFS_SESSION_PREFIX}user'] = user_dict['name']
         session.save()
 
-        return "", 200
+        return toolkit.redirect_to('/')
 
     except Exception as e:
-        log.exception("Azure Login process failed")
+        user_msg = str(e)
+        log.exception(f"Azure Login process failed: {user_msg}")
+        flash_error(user_msg)
+        return base.render("user/login.html", {})
 
-        # Determine the message to show the user
-        if isinstance(e, CreateUserException):
-            # Use the specific message from your custom exception
-            user_msg = str(e)
-        else:
-            user_msg = "An unexpected error occurred during login."
-
-        # Flash it for the next page load
-        flash(user_msg, 'error')
-
-        # Return 400 to trigger the JS redirect
-        return "Login Error", 400
 
 @azure_auth_blueprint.route('/user/_logout')
 def logout():
     userobj = getattr(g, 'userobj', None)
 
     if userobj and userobj.name.startswith(('adfs-', 'b2c-')):
-        log.info(f"Azure user detected: {userobj.name}. Performing Azure logout.")
+        log.info(f"Azure logout for {userobj.name}")
 
         # Logout CKAN session
         toolkit.logout_user()
