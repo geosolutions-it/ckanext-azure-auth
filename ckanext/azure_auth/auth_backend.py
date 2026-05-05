@@ -180,7 +180,14 @@ class AdfsAuthBackend(object):
             log.error(f"User claim's doesn't have the claim 'oid' in his claims: {claims}")
             raise PermissionError
 
-        email = claims.get('unique_name')
+        mail_claims_cfg = config.get(ATTR_MAIL_CLAIMS, "unique_name") or "unique_name"
+        mail_claim_list = [c.strip() for c in mail_claims_cfg.split(",") if c.strip()]
+        email = None
+        for claim_name in mail_claim_list:
+            value = claims.get(claim_name)
+            if value:
+                email = value
+                break
         ckan_id = f'{auth_service_type}-{user_id}'
         username = self.sanitize_username(claims.get('name', ckan_id))
         fullname = f'{claims["given_name"]} {claims["family_name"]}'
