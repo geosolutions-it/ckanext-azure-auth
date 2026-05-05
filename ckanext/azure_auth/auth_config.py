@@ -40,6 +40,9 @@ ATTR_DISABLE_SSO = f'{_EXTNAME}.disable_sso'
 ATTR_USER_ID_TEMPLATE = f'{_EXTNAME}.user_id_template'
 ATTR_POLICY = f'{_EXTNAME}.policy'
 
+# Config key for mail claim(s)
+ATTR_MAIL_CLAIMS = f'{_EXTNAME}.claim.mail'
+
 #SPID level
 ATTR_SPIDL = f'{_EXTNAME}.spidl'
 

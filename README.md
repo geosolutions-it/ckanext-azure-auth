@@ -82,6 +82,12 @@ And these settings:
     # Whether to disable single sign-on and force the ADFS server to show a login prompt.
     ckanext.azure_auth.disable_sso = False
 
+    # Comma-separated list of JWT claim names to try when resolving the user's email address.
+    # The first claim that is present and non-empty will be used.
+    # If this setting is not provided, the default claim "email" is used.
+    # Example for multiple fallback claims:
+    # ckanext.azure_auth.claim.mail = preferred_username, upn, email
+
 
 If you have specific `server_ad`, please remove:
 
@@ -142,6 +148,11 @@ And these settings:
 
     # Allow plugin to create new users
     ckanext.azure_auth.allow_create_users = True
+
+    # Comma-separated list of JWT claim names to try when resolving the user's email address.
+    # The first claim that is present and non-empty will be used.
+    # If this setting is not provided, the default claim "email" is used.
+    ckanext.azure_auth.claim.mail = email
 
 
 For the local environment you can setup callback url like that:
