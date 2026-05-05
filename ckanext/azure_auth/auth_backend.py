@@ -472,10 +472,14 @@ class B2CAuthBackend(AdfsAuthBackend):
                 get_action("user_update")(custom_context, user)
 
         except NotFound:
-            if not email:
-                raise PermissionError("Missing email claim")
-
             if asbool(config.get(ATTR_CREATE_USER, False)):
+                if not email:
+                    msg = (
+                        f"User '{username}' doesn't exist and "
+                        f"email claim is missing, cannot create user."
+                    )
+                    log.error(msg)
+                    raise PermissionError(msg)
                 user = get_action("user_create")(
                     custom_context,
                     {
