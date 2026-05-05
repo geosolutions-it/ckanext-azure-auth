@@ -21,6 +21,7 @@ from ckanext.azure_auth.auth_config import (
     ATTR_REDIRECT_URL,
     ATTR_AUTH_SERVICE,
     ATTR_USER_ID_TEMPLATE,
+    ATTR_MAIL_CLAIMS,
     TIMEOUT,
     ProviderConfig,
 )
@@ -423,7 +424,16 @@ class B2CAuthBackend(AdfsAuthBackend):
             log.error(f"Missing required claim {e}")
             raise PermissionError
 
-        email = claims.get("email")
+        mail_claims_cfg = config.get(ATTR_MAIL_CLAIMS, "email") or "email"
+        mail_claim_list = [c.strip() for c in mail_claims_cfg.split(",") if c.strip()]
+
+        email = None
+        for claim_name in mail_claim_list:
+            value = claims.get(claim_name)
+            if value:
+                email = value
+                break
+
         if not email:
             raise PermissionError("Missing email claim")
 
