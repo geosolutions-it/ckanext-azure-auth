@@ -210,7 +210,7 @@ class AdfsAuthBackend(object):
                     context=custom_context,
                     data_dict=user)
         except NotFound:
-            if config[ATTR_CREATE_USER]:
+            if asbool(config.get(ATTR_CREATE_USER, False)):
                 if not email:
                     msg = (
                         f"User with id '{ckan_id}' doesn't exist and "
