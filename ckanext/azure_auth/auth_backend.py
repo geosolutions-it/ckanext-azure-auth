@@ -180,7 +180,14 @@ class AdfsAuthBackend(object):
             log.error(f"User claim's doesn't have the claim 'oid' in his claims: {claims}")
             raise PermissionError
 
-        email = claims.get('unique_name')
+        mail_claims_cfg = config.get(ATTR_MAIL_CLAIMS, "unique_name") or "unique_name"
+        mail_claim_list = [c.strip() for c in mail_claims_cfg.split(",") if c.strip()]
+        email = None
+        for claim_name in mail_claim_list:
+            value = claims.get(claim_name)
+            if value:
+                email = value
+                break
         ckan_id = f'{auth_service_type}-{user_id}'
         username = self.sanitize_username(claims.get('name', ckan_id))
         fullname = f'{claims["given_name"]} {claims["family_name"]}'
@@ -204,12 +211,20 @@ class AdfsAuthBackend(object):
                 dirty = True
             if dirty:
                 # set some fields required when saving
-                user['email'] = email
+                if email:
+                    user['email'] = email
                 toolkit.get_action('user_update')(
                     context=custom_context,
                     data_dict=user)
         except NotFound:
-            if config[ATTR_CREATE_USER]:
+            if asbool(config.get(ATTR_CREATE_USER, False)):
+                if not email:
+                    msg = (
+                        f"User with id '{ckan_id}' doesn't exist and "
+                        f'email claim is missing, cannot create user.'
+                    )
+                    log.error(msg)
+                    raise PermissionError(msg)
                 user = toolkit.get_action('user_create')(
                     context=custom_context,
                     data_dict={
@@ -434,9 +449,6 @@ class B2CAuthBackend(AdfsAuthBackend):
                 email = value
                 break
 
-        if not email:
-            raise PermissionError("Missing email claim")
-
         username = f"{external_id}"
 
         fullname = f"{claims.get('given_name', '')} {claims.get('family_name', '')}".strip()
@@ -459,7 +471,7 @@ class B2CAuthBackend(AdfsAuthBackend):
             if user.get("fullname") != fullname:
                 user["fullname"] = fullname
                 dirty = True
-            if user.get("email") != email:
+            if email and user.get("email") != email:
                 user["email"] = email
                 dirty = True
 
@@ -468,6 +480,13 @@ class B2CAuthBackend(AdfsAuthBackend):
 
         except NotFound:
             if asbool(config.get(ATTR_CREATE_USER, False)):
+                if not email:
+                    msg = (
+                        f"User '{username}' doesn't exist and "
+                        f"email claim is missing, cannot create user."
+                    )
+                    log.error(msg)
+                    raise PermissionError(msg)
                 user = get_action("user_create")(
                     custom_context,
                     {
