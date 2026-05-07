@@ -134,7 +134,7 @@ class AdfsAuthBackend(BaseAuthBackend):
 
         user_id = claims.get("oid")
         if not user_id:
-            log.error(f"User claim's doesn't have the claim 'oid' in his claims: {claims}")
+            log.error(f"User claims don't have the claim 'oid' in their claims: {claims}")
             raise PermissionError
 
         mail_claims_cfg = config.get(ATTR_MAIL_CLAIMS, "unique_name") or "unique_name"
