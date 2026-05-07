@@ -13,15 +13,7 @@ Features
 
 
 
-Requires python packages:  M2Crypto, pyjwt, xml_python
-
-Linux packages:
-
-    apt install \
-        build-essential \
-        python3-dev \
-        libssl-dev \
-        swig
+Requires python packages:  cryptography, pyjwt, xml_python
 
 What is ADFS?
 -------------
@@ -57,19 +49,17 @@ On the machine hosting your instance of CKAN:
 Ensure all the requirements are installed (see `requirements.txt` for further
 details).
 
-In your CKAN's settings.ini file add inside the [app:main] section `azure_auth` into a `ckan.plugins`:
+In your CKAN's settings.ini file add inside the [app:main] section `azure_auth_adfs` into a `ckan.plugins`:
 
     [app:main]
 
-    ckan.plugins = stats text_view image_view recline_view azure_auth
+    ckan.plugins = stats text_view image_view recline_view azure_auth_adfs
 
 And these settings:
 
     [app:main]
 
-    ckanext.azure_auth.mode = adfs # If you use the ADFS
-    ckanext.azure_auth.auth_service_type = adfs # If you use the adfs 
-    ckanext.azure_auth.wtrealm = <..uuid..>
+    ckanext.azure_auth.auth_service_type = adfs
     ckanext.azure_auth.tenant_id = <..uuid..>
     ckanext.azure_auth.client_id = <..uuid..>
     ckanext.azure_auth.audience = <..uuid..>
@@ -124,19 +114,17 @@ Configure for B2C
 * * Single tenant (example based on this config)
 For more details please follow the official docs [here](https://learn.microsoft.com/en-us/azure/active-directory-b2c/tutorial-register-applications)
 
-In your CKAN's settings file (ckan.ini) file add inside the [app:main] section `azure_auth` into a `ckan.plugins`:
+In your CKAN's settings file (ckan.ini) file add inside the [app:main] section `azure_auth_b2c` into a `ckan.plugins`:
 
     [app:main]
 
-    ckan.plugins = stats text_view image_view recline_view azure_auth
+    ckan.plugins = stats text_view image_view recline_view azure_auth_b2c
 
 And these settings:
 
     [app:main]
 
-    ckanext.azure_auth.mode = b2c # If you use the B2C 
-    ckanext.azure_auth.auth_service_type = b2c # If you use the B2C 
-    ckanext.azure_auth.service_domain = <service domain>>
+    ckanext.azure_auth.service_domain = <service domain>
     ckanext.azure_auth.tenant_id = <tenant domain>
     ckanext.azure_auth.client_id = <..uuid..>
     ckanext.azure_auth.policy = <policy>
@@ -173,7 +161,7 @@ Activate and install requirements with the `pip` command:
 
 After authentication, tokens stored into
 
-    session[f'{ADFS_SESSION_PRREFIX}tokens']
+    session[f'{ADFS_SESSION_PREFIX}tokens']
     ----
     {
       'token_type': 'Bearer',
@@ -186,7 +174,7 @@ After authentication, tokens stored into
     }
 
 
-where `ADFS_SESSION_PRREFIX = 'adfs-'`
+where `ADFS_SESSION_PREFIX = 'adfs-'`
 
 
 
