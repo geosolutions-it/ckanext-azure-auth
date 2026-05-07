@@ -1,6 +1,6 @@
 import logging
-import uuid
 import re
+from abc import ABC, abstractmethod
 
 import jwt
 from jwt import decode, PyJWKClient
@@ -23,7 +23,7 @@ from ckanext.azure_auth.auth_config import (
     ATTR_USER_ID_TEMPLATE,
     ATTR_MAIL_CLAIMS,
     TIMEOUT,
-    ProviderConfig,
+    BaseProviderConfig,
 )
 from ckanext.azure_auth.exceptions import (
     AzureReloginRequiredException,
@@ -35,8 +35,10 @@ from ckanext.azure_auth.exceptions import (
 log = logging.getLogger(__name__)
 
 
-class AdfsAuthBackend(object):
-    provider_config: ProviderConfig
+class BaseAuthBackend(ABC):
+    """Abstract base class for authentication backends."""
+
+    provider_config: BaseProviderConfig
 
     def __init__(self, provider_config):
         self.provider_config = provider_config
@@ -44,7 +46,6 @@ class AdfsAuthBackend(object):
     @staticmethod
     def _get_fixed_user_schema():
         """Returns the default user schema but with an optional password."""
-        # You need to ensure default_user_schema is imported at the top of the file
         from ckan.logic.schema import default_user_schema
 
         schema = default_user_schema()
@@ -61,6 +62,33 @@ class AdfsAuthBackend(object):
             unicode_safe
         ]
         return schema
+
+    @staticmethod
+    def sanitize_username(tag: str):
+        """Normalise a raw display name into a valid CKAN username.
+
+        Converts Unicode characters to ASCII equivalents, lowercases the
+        result, strips leading/trailing whitespace, removes any character
+        that is not alphanumeric or a hyphen, and replaces spaces with
+        hyphens.
+        """
+        tag = substitute_ascii_equivalents(tag)
+        tag = tag.lower().strip()
+        tag = re.sub(r'[^a-zA-Z0-9\- ]', '', tag).replace(' ', '-')
+        return tag
+
+    @abstractmethod
+    def get_or_create_user(self, claims):
+        """Create or retrieve a CKAN user from token claims."""
+        pass
+
+    @abstractmethod
+    def process_access_token(self, *args, **kwargs):
+        """Validate a token and return the corresponding CKAN user."""
+        pass
+
+
+class AdfsAuthBackend(BaseAuthBackend):
 
     def exchange_auth_code(self, authorization_code):
         log.debug('Received authorization code: %s', authorization_code)
@@ -247,13 +275,6 @@ class AdfsAuthBackend(object):
                 raise CreateUserException(msg)
         return user
 
-    @staticmethod
-    def sanitize_username(tag: str):
-        tag = substitute_ascii_equivalents(tag)
-        tag = tag.lower().strip()
-        tag = re.sub(r'[^a-zA-Z0-9\- ]', '', tag).replace(' ', '-')
-        return tag
-
     def authenticate_with_code(self, authorization_code=None, **kwargs):
         '''
         Authentication backend to allow authenticating users against a
@@ -297,10 +318,9 @@ class AdfsAuthBackend(object):
         return user
 
 
-class B2CAuthBackend(AdfsAuthBackend):
+class B2CAuthBackend(BaseAuthBackend):
     """
     Authentication backend for Azure B2C (MyIdentity) using implicit flow (id_token).
-    Inherits from AdfsAuthBackend to reuse token validation and CKAN user creation.
     """
 
     def process_access_token(self, id_token):
@@ -346,12 +366,17 @@ class B2CAuthBackend(AdfsAuthBackend):
         user = self.get_or_create_user(claims)
         return user
 
-    def validate_access_token(self, id_token: str, expected_nonce: str):
+    def validate_id_token(self, id_token: str, expected_nonce: str):
         """
-        Fully compliant Azure B2C ID token validation using PyJWKClient.
+        Validate an Azure B2C ID token using PyJWKClient.
 
-        :param id_token: JWT received from the frontend
-        :param expected_nonce: Nonce stored in session
+        Unlike AdfsAuthBackend.validate_access_token, this method accepts an
+        *id_token* (not an opaque access token) and requires a *nonce* claim
+        for replay-attack protection — both characteristics of the B2C
+        implicit flow.
+
+        :param id_token: JWT id_token received from the frontend
+        :param expected_nonce: Nonce stored in session before the login redirect
         :return: Decoded claims dict if valid
         """
         if not id_token:
@@ -411,7 +436,7 @@ class B2CAuthBackend(AdfsAuthBackend):
         else:
             expected_nonce = None  # fallback for CLI/testing or non-request context
 
-        claims = self.validate_access_token(id_token, expected_nonce)
+        claims = self.validate_id_token(id_token, expected_nonce)
 
         return claims
 

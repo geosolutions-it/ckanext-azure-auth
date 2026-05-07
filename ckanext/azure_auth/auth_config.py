@@ -2,6 +2,7 @@ import base64
 import logging
 import json
 import jwt
+from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
 from xml.etree import ElementTree
@@ -70,18 +71,40 @@ log = logging.getLogger(__name__)
 TIMEOUT = 120
 
 
-class ProviderConfig(object):
+class BaseProviderConfig(ABC):
+    """Abstract base class for provider configuration."""
+
+    authorization_endpoint = None
+    """URL of the OAuth2/OIDC authorization endpoint."""
+
+    token_endpoint = None
+    """URL of the token exchange endpoint."""
+
+    end_session_endpoint = None
+    """URL for ending the user's SSO session."""
+
+    issuer = None
+    """Expected token issuer (iss claim value)."""
+
+    session = None
+    """HTTP session used for requests to the identity provider."""
+
+    @abstractmethod
+    def load_config(self):
+        """Load the provider configuration (endpoints, keys, etc.)."""
+        pass
+
+    @abstractmethod
+    def build_authorization_endpoint(self):
+        """Return the authorization URL to redirect the user to."""
+        pass
+
+
+class ProviderConfig(BaseProviderConfig):
     _config_timestamp = None
     _mode = None
 
-    authorization_endpoint = None
     signing_keys = None
-    token_endpoint = None
-    end_session_endpoint = None
-    issuer = None
-
-    # http_session
-    session = None
 
     def __init__(self):
         method_whitelist = frozenset(
@@ -274,9 +297,8 @@ class ProviderConfig(object):
         return self.end_session_endpoint
 
 
-class B2CProviderConfig(ProviderConfig):
+class B2CProviderConfig(BaseProviderConfig):
     def __init__(self, service_domain, service_id, tenant_id, policy, client_id, redirect_uri, spidl='2'):
-        super().__init__()
         self.service_domain = service_domain
         self.service_id = service_id
         self.tenant_id = tenant_id
