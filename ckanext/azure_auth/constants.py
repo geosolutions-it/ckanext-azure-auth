@@ -25,6 +25,7 @@ ATTR_DISABLE_SSO = f'{_EXTNAME}.disable_sso'
 ATTR_USER_ID_TEMPLATE = f'{_EXTNAME}.user_id_template'
 ATTR_POLICY = f'{_EXTNAME}.policy'
 ATTR_SCOPE = f'{_EXTNAME}.scope'
+ATTR_RESPONSE_TYPE = f'{_EXTNAME}.response_type'
 ATTR_CUSTOM_USER_FUNC = f'{_EXTNAME}.custom_user_func'
 ATTR_MAIL_CLAIMS = f'{_EXTNAME}.claim.mail'
 

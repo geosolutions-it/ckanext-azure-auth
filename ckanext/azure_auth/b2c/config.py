@@ -78,7 +78,7 @@ class B2CProviderConfig(BaseProviderConfig):
         query = {
             'client_id': self.client_id,
             'redirect_uri': self.get_redirect_url(),
-            'response_type': 'id_token token',
+            'response_type': self.response_type,
             'scope': self.scope,
             'state': state,
             'prompt': 'login',

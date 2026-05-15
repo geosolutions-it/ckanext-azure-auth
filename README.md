@@ -122,11 +122,15 @@ These are the settings for B2C, to be added inside the `[app:main]` section:
 
     [app:main]
 
+    # Required settings
     ckanext.azure_auth.service_domain = <service domain>
     ckanext.azure_auth.tenant_id = <tenant domain>
     ckanext.azure_auth.client_id = <uuid>
     ckanext.azure_auth.policy = <policy>
-    ckanext.azure_auth.scope = <scope>
+
+    # Optional settings with defaults
+    ckanext.azure_auth.scope = openid
+    ckanext.azure_auth.response_type = id_token
 
     # String template to generate the CKAN user_id from the JWT claims
     ckanext.azure_auth.user_id_template="{extension_fiscalNumber}
@@ -139,14 +143,20 @@ These are the settings for B2C, to be added inside the `[app:main]` section:
     # ckanext.azure_auth.claim.mail = email
 
     # Custom function to call after successful authentication, for example to fetch additional user data from external services
-    # ckanext.azure_auth.custom_user_func = ckanext.provbz.azure.custom.call_mydata_service
+    # ckanext.azure_auth.custom_user_func = ckanext.your_extension.your_module.your_function
 
     # Authentication level (spidl)
-    ckanext.azure_auth.spidl = 1 # you can select between level 1, 2 or 3
+    ckanext.azure_auth.spidl = 2
 
     # Callback path; the full URL should be whitelisted on the identity service
     # By default it's /azure/signin; modify only if you have issues in whitelisting
     # ckanext.azure_auth.auth_callback_path =  /azure/signin
+
+In case you have a custom function, you may need an access token, so you can add the scope for it:
+
+    ckanext.azure_auth.response_type = id_token token
+    ckanext.azure_auth.scope = openid https://sample.onmicrosoft.com/sample_uuid/access_as_user
+    ckanext.azure_auth.custom_user_func = ckanext.your_extension.your_module.your_function
 
 Development Environment:
 ------------------------

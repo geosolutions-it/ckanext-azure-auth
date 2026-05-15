@@ -174,5 +174,6 @@ class B2CAuthBackend(BaseAuthBackend):
             # This is the only expected exception, its message will be flashed on the UI
             raise
         except Exception as e:
-            log.error(f"Error customizing user data: {e}", exc_info=True)
-            raise
+            msg = f"Error running custom user function: {e}"
+            log.error(msg, exc_info=True)
+            raise PermissionError(msg)

@@ -9,10 +9,8 @@ from ckanext.azure_auth.b2c.blueprint import b2c_auth_blueprint, azure_admin_blu
 from ckanext.azure_auth.b2c.config import b2c_config
 from ckanext.azure_auth.constants import (
     ADFS_SESSION_PREFIX,
-    ATTR_AUTH_CALLBACK_PATH,
     ATTR_LOGIN_BUTTON,
     ATTR_LOGIN_LABEL,
-    ATTR_SPIDL,
     RENDERABLE_ATTRS,
 )
 
@@ -32,13 +30,6 @@ class AzureB2CPlugin(plugins.SingletonPlugin):
         toolkit.add_public_directory(config, '../public')
 
         toolkit.add_ckan_admin_tab(config, 'azure_admin.azure_auth_config', 'Azure B2C', icon='windows')
-
-        b2c_defaults = (
-            (ATTR_AUTH_CALLBACK_PATH, '/azure/signin'),
-            (ATTR_SPIDL, '2'),
-        )
-        for k, d in b2c_defaults:
-            config.setdefault(k, d)
 
     def update_config_schema(self, schema):
         unicode_safe = toolkit.get_validator('unicode_safe')
