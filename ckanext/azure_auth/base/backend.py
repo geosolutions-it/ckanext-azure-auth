@@ -1,6 +1,7 @@
 """
 Shared abstract base class for Azure auth backends.
 """
+
 import logging
 import re
 from abc import ABC, abstractmethod
@@ -24,17 +25,12 @@ class BaseAuthBackend(ABC):
 
         schema = default_user_schema()
 
-        ignore_missing = toolkit.get_validator('ignore_missing')
-        user_password_validator = toolkit.get_validator('user_password_validator')
-        user_password_not_empty = toolkit.get_validator('user_password_not_empty')
-        unicode_safe = toolkit.get_validator('unicode_safe')
+        ignore_missing = toolkit.get_validator("ignore_missing")
+        user_password_validator = toolkit.get_validator("user_password_validator")
+        user_password_not_empty = toolkit.get_validator("user_password_not_empty")
+        unicode_safe = toolkit.get_validator("unicode_safe")
 
-        schema['password'] = [
-            ignore_missing,
-            user_password_validator,
-            user_password_not_empty,
-            unicode_safe
-        ]
+        schema["password"] = [ignore_missing, user_password_validator, user_password_not_empty, unicode_safe]
         return schema
 
     @staticmethod
@@ -48,7 +44,7 @@ class BaseAuthBackend(ABC):
         """
         tag = substitute_ascii_equivalents(tag)
         tag = tag.lower().strip()
-        tag = re.sub(r'[^a-zA-Z0-9\- ]', '', tag).replace(' ', '-')
+        tag = re.sub(r"[^a-zA-Z0-9\- ]", "", tag).replace(" ", "-")
         return tag
 
     def _build_user_id(self, claims: dict):
@@ -71,4 +67,3 @@ class BaseAuthBackend(ABC):
             if value:
                 return value
         return None
-

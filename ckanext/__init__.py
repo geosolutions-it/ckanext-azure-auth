@@ -1,13 +1,15 @@
 # encoding: utf-8
 
-__version__ = '0.9.9'
-__description__ = 'ADFS Authentication'
-__long_description__ = '''
-'''
-__license__ = 'AGPL'
+__version__ = "0.9.9"
+__description__ = "ADFS Authentication"
+__long_description__ = """
+"""
+__license__ = "AGPL"
 
 # The packaging system relies on this import, please do not remove it
-import sys; sys.path.insert(0, __path__[0])
+import sys
+
+sys.path.insert(0, __path__[0])
 
 
 # this is a namespace package

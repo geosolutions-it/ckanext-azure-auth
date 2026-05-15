@@ -1,6 +1,7 @@
 """
 Shared abstract base classes for Azure auth provider configuration.
 """
+
 from abc import ABC, abstractmethod
 
 from ckan.common import config
@@ -41,4 +42,4 @@ class BaseProviderConfig:
         raise NotImplementedError()
 
     def get_redirect_url(self):
-        return config['ckan.site_url'] + self.auth_callback_path
+        return config["ckan.site_url"] + self.auth_callback_path

@@ -11,14 +11,15 @@ from ckanext.azure_auth.constants import (
     ADFS_SESSION_PREFIX,
     ATTR_LOGIN_BUTTON,
     ATTR_LOGIN_LABEL,
-    RENDERABLE_ATTRS, ATTR_AUTH_CALLBACK_PATH,
+    RENDERABLE_ATTRS,
+    ATTR_AUTH_CALLBACK_PATH,
 )
 
 log = logging.getLogger(__name__)
 
 
 class AzureB2CPlugin(plugins.SingletonPlugin):
-    '''Microsoft Azure B2C (MyIdentity) authentication plugin.'''
+    """Microsoft Azure B2C (MyIdentity) authentication plugin."""
 
     plugins.implements(plugins.IBlueprint)
     plugins.implements(plugins.IConfigurer)
@@ -26,14 +27,14 @@ class AzureB2CPlugin(plugins.SingletonPlugin):
     plugins.implements(plugins.IAuthenticator)
 
     def update_config(self, config):
-        toolkit.add_template_directory(config, '../templates')
-        toolkit.add_public_directory(config, '../public')
+        toolkit.add_template_directory(config, "../templates")
+        toolkit.add_public_directory(config, "../public")
 
-        toolkit.add_ckan_admin_tab(config, 'azure_admin.azure_auth_config', 'Azure B2C', icon='windows')
+        toolkit.add_ckan_admin_tab(config, "azure_admin.azure_auth_config", "Azure B2C", icon="windows")
 
     def update_config_schema(self, schema):
-        unicode_safe = toolkit.get_validator('unicode_safe')
-        ignore_missing = toolkit.get_validator('ignore_missing')
+        unicode_safe = toolkit.get_validator("unicode_safe")
+        ignore_missing = toolkit.get_validator("ignore_missing")
 
         schema.update(
             {
@@ -51,17 +52,17 @@ class AzureB2CPlugin(plugins.SingletonPlugin):
                 return False
             try:
                 user_obj = model.User.get(user_id)
-                return user_obj and 'azure_auth' in user_obj.plugin_extras
+                return user_obj and "azure_auth" in user_obj.plugin_extras
             except Exception:
                 return False
 
         def get_attrib(key):
             if key not in RENDERABLE_ATTRS:
-                raise NotAuthorized('Attribute is not accessible')
-            return get_action('config_option_show')({'ignore_auth': True}, {'key': key})
+                raise NotAuthorized("Attribute is not accessible")
+            return get_action("config_option_show")({"ignore_auth": True}, {"key": key})
 
         try:
-            adfs_authentication_endpoint_error = ''
+            adfs_authentication_endpoint_error = ""
             adfs_authentication_endpoint = b2c_config.build_authorization_endpoint()
         except RuntimeError as err:
             log.critical(err)
@@ -69,10 +70,10 @@ class AzureB2CPlugin(plugins.SingletonPlugin):
             adfs_authentication_endpoint_error = str(err)
 
         return {
-            'is_azure_user': is_azure_user,
-            'adfs_authentication_endpoint': adfs_authentication_endpoint,
-            'adfs_authentication_endpoint_error': adfs_authentication_endpoint_error,
-            'adfs_get_attrib': get_attrib,
+            "is_azure_user": is_azure_user,
+            "adfs_authentication_endpoint": adfs_authentication_endpoint,
+            "adfs_authentication_endpoint_error": adfs_authentication_endpoint_error,
+            "adfs_get_attrib": get_attrib,
         }
 
     def get_blueprint(self):
@@ -80,7 +81,7 @@ class AzureB2CPlugin(plugins.SingletonPlugin):
 
     # IAuthenticator
     def identify(self):
-        user = session.get(f'{ADFS_SESSION_PREFIX}user')
+        user = session.get(f"{ADFS_SESSION_PREFIX}user")
         if user:
             g.user = user
 
@@ -88,12 +89,10 @@ class AzureB2CPlugin(plugins.SingletonPlugin):
         pass
 
     def logout(self):
-        if f'{ADFS_SESSION_PREFIX}tokens' in session:
-            del session[f'{ADFS_SESSION_PREFIX}tokens']
+        if f"{ADFS_SESSION_PREFIX}tokens" in session:
+            del session[f"{ADFS_SESSION_PREFIX}tokens"]
 
-        keys_to_delete = [
-            key for key in session if key.startswith(ADFS_SESSION_PREFIX)
-        ]
+        keys_to_delete = [key for key in session if key.startswith(ADFS_SESSION_PREFIX)]
         if keys_to_delete:
             for key in keys_to_delete:
                 del session[key]

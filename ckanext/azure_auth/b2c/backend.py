@@ -1,6 +1,7 @@
 """
 Azure B2C (MyIdentity) authentication backend.
 """
+
 import importlib
 import logging
 
@@ -27,7 +28,7 @@ class B2CAuthBackend(BaseAuthBackend):
 
     provider_config: B2CProviderConfig
 
-    def __init__(self, provider_config:B2CProviderConfig):
+    def __init__(self, provider_config: B2CProviderConfig):
         self.provider_config = provider_config
 
     def process_tokens(self, id_token, access_token=None):
@@ -40,7 +41,7 @@ class B2CAuthBackend(BaseAuthBackend):
         if not claims:
             raise PermissionError("Invalid id_token")
 
-        log.debug(f'Decoded claims: {claims}')
+        log.debug(f"Decoded claims: {claims}")
         return self.get_or_create_user(claims, access_token)
 
     def decode_id_token(self, id_token: str) -> dict:
@@ -69,7 +70,7 @@ class B2CAuthBackend(BaseAuthBackend):
                     "verify_aud": True,
                     "verify_iss": True,
                 },
-                leeway=60
+                leeway=60,
             )
 
         except InvalidTokenError as e:
@@ -77,12 +78,12 @@ class B2CAuthBackend(BaseAuthBackend):
             raise PermissionError("Invalid id_token")
 
         # Validate nonce
-        expected_nonce = session.get(f"{ADFS_SESSION_PREFIX}nonce", 'defaultNonce')
+        expected_nonce = session.get(f"{ADFS_SESSION_PREFIX}nonce", "defaultNonce")
         if claims.get("nonce") != expected_nonce:
             raise PermissionError("Invalid nonce in id_token")
 
         # Validate policy / user flow (tfp claim)
-        token_policy = claims.get('acr') or claims.get('tfp')
+        token_policy = claims.get("acr") or claims.get("tfp")
         if not token_policy:
             log.warning("No policy claim found in token")
         else:
@@ -100,10 +101,7 @@ class B2CAuthBackend(BaseAuthBackend):
         fullname = f"{claims.get('given_name', '')} {claims.get('family_name', '')}".strip() or username
 
         try:
-            user = get_action("user_show")(
-                {"ignore_auth": True},
-                {"id": username}
-            )
+            user = get_action("user_show")({"ignore_auth": True}, {"id": username})
 
             dirty = False
             if user.get("fullname") != fullname:
@@ -114,12 +112,7 @@ class B2CAuthBackend(BaseAuthBackend):
                 dirty = True
 
             if dirty:
-                get_action("user_update")(
-                    {
-                        "ignore_auth": True,
-                        "schema": self._get_fixed_user_schema()
-                    },
-                    user)
+                get_action("user_update")({"ignore_auth": True, "schema": self._get_fixed_user_schema()}, user)
 
             return user
 
@@ -132,14 +125,7 @@ class B2CAuthBackend(BaseAuthBackend):
             log.warning(msg)
             raise CreateUserException(msg)
 
-        user_dict = {
-                "name": username,
-                "fullname": fullname,
-                "email": email,
-                "plugin_extras": {
-                    "azure_auth": username
-                }
-            }
+        user_dict = {"name": username, "fullname": fullname, "email": email, "plugin_extras": {"azure_auth": username}}
 
         # hook to update user info if needed (e.g. call backend services to fill in missing email or other info)
         self.customize_user_data(user_dict, claims, access_token)
@@ -150,11 +136,11 @@ class B2CAuthBackend(BaseAuthBackend):
             raise PermissionError(msg)
 
         user = get_action("user_create")(
-            { # context
+            {  # context
                 "ignore_auth": True,
-                "schema": self._get_fixed_user_schema()
+                "schema": self._get_fixed_user_schema(),
             },
-            user_dict
+            user_dict,
         )
         log.debug(f"User created --> {user['id']}")
         return user
@@ -165,7 +151,7 @@ class B2CAuthBackend(BaseAuthBackend):
             return
 
         log.debug(f"Running user data custom function {custom_user_func}...")
-        module_path, function_name = custom_user_func.rsplit('.', 1)
+        module_path, function_name = custom_user_func.rsplit(".", 1)
         module = importlib.import_module(module_path)
         func = getattr(module, function_name)
         try:
