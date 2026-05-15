@@ -7,8 +7,8 @@ import jwt
 
 from ckan.common import _, config, session, asbool
 from ckan.logic import NotFound
-from ckan.logic import get_action
 from ckan.plugins import toolkit
+from ckanext.azure_auth.adfs.config import AdfsProviderConfig
 
 from ckanext.azure_auth.base.backend import BaseAuthBackend
 from ckanext.azure_auth.constants import (
@@ -16,10 +16,6 @@ from ckanext.azure_auth.constants import (
     ATTR_ADSF_AUDIENCE,
     ATTR_CLIENT_ID,
     ATTR_CLIENT_SECRET,
-    ATTR_REDIRECT_URL,
-    ATTR_AUTH_SERVICE,
-    ATTR_USER_ID_TEMPLATE,
-    ATTR_MAIL_CLAIMS,
     ATTR_CREATE_USER,
     TIMEOUT,
 )
@@ -35,12 +31,17 @@ log = logging.getLogger(__name__)
 
 class AdfsAuthBackend(BaseAuthBackend):
 
+    provider_config: AdfsProviderConfig
+
+    def __init__(self, provider_config:AdfsProviderConfig):
+        self.provider_config = provider_config
+
     def exchange_auth_code(self, authorization_code):
         log.debug('Received authorization code: %s', authorization_code)
         data = {
             'grant_type': 'authorization_code',
             'client_id': config[ATTR_CLIENT_ID],
-            'redirect_uri': config[ATTR_REDIRECT_URL],
+            'redirect_uri': self._get_redirect_url(),
             'code': authorization_code,
         }
         if config[ATTR_CLIENT_SECRET]:
@@ -116,6 +117,10 @@ class AdfsAuthBackend(BaseAuthBackend):
                 log.info(str(error))
                 raise PermissionError
 
+        log.warning(f'No valid signature found')
+        raise PermissionError('No valid signature found')
+
+
     def process_access_token(self, access_token, adfs_response=None):
         if not access_token:
             raise PermissionError
@@ -129,33 +134,23 @@ class AdfsAuthBackend(BaseAuthBackend):
         return self.get_or_create_user(claims)
 
     def get_or_create_user(self, claims):
-        '''Create the user if it doesn't exist yet.'''
-        auth_service_type = config.get(ATTR_AUTH_SERVICE)
-
+        """Create the user if it doesn't exist yet."""
         user_id = claims.get("oid")
         if not user_id:
             log.error(f"User claims don't have the claim 'oid' in their claims: {claims}")
             raise PermissionError
 
-        mail_claims_cfg = config.get(ATTR_MAIL_CLAIMS, "unique_name") or "unique_name"
-        mail_claim_list = [c.strip() for c in mail_claims_cfg.split(",") if c.strip()]
-        email = None
-        for claim_name in mail_claim_list:
-            value = claims.get(claim_name)
-            if value:
-                email = value
-                break
-        ckan_id = f'{auth_service_type}-{user_id}'
+        email = self._discover_mail(claims)
+        ckan_id = self._build_user_id(claims)
         username = self.sanitize_username(claims.get('name', ckan_id))
         fullname = f'{claims["given_name"]} {claims["family_name"]}'
 
-        custom_context = {
+        context = {
             "ignore_auth": True,
             "schema": self._get_fixed_user_schema()
         }
-
         try:
-            user = toolkit.get_action('user_show')(data_dict={'id': ckan_id})
+            user = toolkit.get_action('user_show')({"ignore_auth": True},{"id": ckan_id})
             log.debug(f"User found --> {user}")
             dirty = False
             if user['name'] != username:
@@ -167,9 +162,7 @@ class AdfsAuthBackend(BaseAuthBackend):
             if dirty:
                 if email:
                     user['email'] = email
-                toolkit.get_action('user_update')(
-                    context=custom_context,
-                    data_dict=user)
+                toolkit.get_action('user_update')(context, user)
         except NotFound:
             if asbool(config.get(ATTR_CREATE_USER, False)):
                 if not email:
@@ -180,8 +173,8 @@ class AdfsAuthBackend(BaseAuthBackend):
                     log.error(msg)
                     raise PermissionError(msg)
                 user = toolkit.get_action('user_create')(
-                    context=custom_context,
-                    data_dict={
+                    context,
+                    {
                         'id': ckan_id,
                         'name': username,
                         'fullname': fullname,
@@ -202,8 +195,8 @@ class AdfsAuthBackend(BaseAuthBackend):
         return user
 
     def authenticate_with_code(self, authorization_code=None, **kwargs):
-        '''Authenticate using an authorization code from ADFS.'''
-        self.provider_config.load_config()
+        """Authenticate using an authorization code from ADFS."""
+        self.provider_config.load_remote_config()
 
         if not bool(authorization_code):
             log.debug('No authorization code was received')
@@ -215,8 +208,8 @@ class AdfsAuthBackend(BaseAuthBackend):
         return user
 
     def authenticate_with_token(self, access_token=None, **kwargs):
-        '''Authenticate using an access token retrieved by the client.'''
-        self.provider_config.load_config()
+        """Authenticate using an access token retrieved by the client."""
+        self.provider_config.load_remote_config()
 
         if not bool(access_token):
             log.debug('No authorization code was received')

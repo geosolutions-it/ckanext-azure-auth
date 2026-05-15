@@ -20,7 +20,6 @@ from ckanext.azure_auth.constants import (
     ATTR_CLIENT_ID,
     ATTR_DISABLE_SSO,
     ATTR_FORCE_MFA,
-    ATTR_REDIRECT_URL,
     ATTR_TENANT_ID,
     _EXTNAME,
 )
@@ -47,7 +46,9 @@ class AdfsProviderConfig(BaseProviderConfig):
 
     signing_keys = None
 
-    def __init__(self):
+    def __init__(self, ckan_config):
+        super().__init__(ckan_config)
+
         method_whitelist = frozenset(
             ['HEAD', 'GET', 'PUT', 'DELETE', 'OPTIONS', 'TRACE', 'POST']
         )
@@ -65,7 +66,7 @@ class AdfsProviderConfig(BaseProviderConfig):
         self.session.mount('https://', adapter)
         self.session.verify = config[f'{_EXTNAME}.ca_bundle']
 
-    def load_config(self):
+    def load_remote_config(self):
         # If loaded data is too old, reload it again
         refresh_time = datetime.now() - timedelta(
             hours=config[f'{_EXTNAME}.config_reload_interval']
@@ -187,7 +188,7 @@ class AdfsProviderConfig(BaseProviderConfig):
 
     def build_authorization_endpoint(self):
         '''Return the ADFS authorization URL.'''
-        self.load_config()
+        self.load_remote_config()
         redirect_to = base64.urlsafe_b64encode(b'/').decode()
         query = {
             'response_type': 'code',
@@ -206,5 +207,5 @@ class AdfsProviderConfig(BaseProviderConfig):
 
     def build_end_session_endpoint(self):
         '''Return the ADFS end session URL to log a user out.'''
-        self.load_config()
+        self.load_remote_config()
         return self.end_session_endpoint

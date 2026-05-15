@@ -1,65 +1,85 @@
 """
-Azure B2C (MyIdentity) provider configuration.
+Azure B2C provider configuration.
 """
 import base64
 import logging
 import secrets
+from datetime import datetime, timedelta
 from urllib.parse import urlencode
 
 import requests
 
 from ckan.common import config
 from ckanext.azure_auth.base.config import BaseProviderConfig
-from ckanext.azure_auth.constants import ADFS_SESSION_PREFIX
+from ckanext.azure_auth.constants import (
+    ADFS_SESSION_PREFIX,
+    ATTR_SPIDL
+)
 
 log = logging.getLogger(__name__)
 
 
+class OIDCDiscoverCfg:
+    def __init__(self, authorization_endpoint, token_endpoint, end_session_endpoint, issuer, jwks_uri):
+        self.authorization_endpoint = authorization_endpoint
+        self.token_endpoint = token_endpoint
+        self.end_session_endpoint = end_session_endpoint
+        self.issuer = issuer
+        self.jwks_uri = jwks_uri
+
+
 class B2CProviderConfig(BaseProviderConfig):
-    def __init__(self, service_domain, service_id, tenant_id, policy, client_id, redirect_uri, spidl='2'):
-        self.service_domain = service_domain
-        self.service_id = service_id
-        self.tenant_id = tenant_id
-        self.policy = policy
-        self.client_id = client_id
-        self.redirect_uri = redirect_uri
-        self.spidl = spidl
-        self.session = requests.Session()
+    def __init__(self, ckan_config):
+        super().__init__(ckan_config)
 
-        self.authorization_endpoint = None
-        self.token_endpoint = None
-        self.end_session_endpoint = None
-        self.issuer = None
-        self.jwks_uri = None
+        self.spidl = ckan_config.get(ATTR_SPIDL, '2')
 
-    def load_config(self):
-        """Load OpenID Connect configuration from Azure B2C (MyIdentity)."""
+        self.oidc_config = None
+        self.last_load = None
+
+    def get_remote_config(self):
+        log.debug("Request loading of Azure B2C configuration")
+
+        datetime_now = datetime.now()
+        if self.last_load and (datetime_now - self.last_load) < timedelta(minutes=5):
+            log.debug("Skipping loading of Azure B2C configuration (last load is %s)", self.last_load)
+            return self.oidc_config  # return cached config
+
         config_url = (
             f"https://{self.service_domain}/"
             f"{self.tenant_id}/v2.0/.well-known/openid-configuration?p={self.policy}"
         )
+        log.debug("Loading Azure B2C configuration - URL: %s -- Last load %s", config_url, self.last_load)
 
-        resp = self.session.get(config_url, timeout=120)
+        session = requests.Session()
+        resp = session.get(config_url, timeout=120)
         resp.raise_for_status()
         cfg = resp.json()
 
-        self.authorization_endpoint = cfg['authorization_endpoint']
-        self.token_endpoint = cfg['token_endpoint']
-        self.end_session_endpoint = cfg.get('end_session_endpoint')
-        self.issuer = cfg['issuer']
-        self.jwks_uri = cfg['jwks_uri']
+        log.debug("Received Azure B2C configuration: %s", cfg)
+
+        self.oidc_config = OIDCDiscoverCfg(
+            authorization_endpoint=cfg['authorization_endpoint'],
+            token_endpoint=cfg['token_endpoint'],
+            end_session_endpoint=cfg['end_session_endpoint'],
+            issuer=cfg['issuer'],
+            jwks_uri=cfg['jwks_uri'])
+
+        # reset the timer
+        self.last_load = datetime_now
+        return self.oidc_config
 
     def build_authorization_endpoint(self, redirect_to_path='/'):
         """Build the authorization URL for B2C login."""
-        self.load_config()
+        oidc_cfg = self.get_remote_config()
 
         state = base64.urlsafe_b64encode(redirect_to_path.encode()).decode()
 
         query = {
             'client_id': self.client_id,
-            'redirect_uri': self.redirect_uri,
-            'response_type': 'id_token',
-            'scope': 'openid',
+            'redirect_uri': self.get_redirect_url(),
+            'response_type': 'id_token token',
+            'scope': self.scope,
             'state': state,
             'prompt': 'login',
         }
@@ -79,19 +99,14 @@ class B2CProviderConfig(BaseProviderConfig):
         if self.spidl:
             query['spidl'] = self.spidl
 
-        url = f"{self.authorization_endpoint}&{urlencode(query)}"
+        url = f"{oidc_cfg.authorization_endpoint}&{urlencode(query)}"
         log.info(f"B2C authorization URL: {url}")
         return url
 
     def build_logout_endpoint(self):
         """Construct the B2C logout URL dynamically."""
-        if not self.end_session_endpoint:
-            self.load_config()
-
-        post_logout_uri = config.get('ckan.site_url').rstrip('/')
-
         params = {
-            'post_logout_redirect_uri': post_logout_uri
+            'post_logout_redirect_uri': config.get('ckan.site_url').rstrip('/')
         }
 
         from flask import session as flask_session
@@ -99,5 +114,9 @@ class B2CProviderConfig(BaseProviderConfig):
         if id_token:
             params['id_token_hint'] = id_token
 
-        separator = '&' if '?' in self.end_session_endpoint else '?'
-        return f"{self.end_session_endpoint}{separator}{urlencode(params)}"
+        oidc_cfg = self.get_remote_config()
+        separator = '&' if '?' in oidc_cfg.end_session_endpoint else '?'
+        return f"{oidc_cfg.end_session_endpoint}{separator}{urlencode(params)}"
+
+
+b2c_config = B2CProviderConfig(config)

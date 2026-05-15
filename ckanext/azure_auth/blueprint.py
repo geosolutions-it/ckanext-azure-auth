@@ -12,5 +12,5 @@ def get_auth_backend():
     """Deprecated helper kept for back-compat. Creates an ADFS backend."""
     from ckanext.azure_auth.adfs.backend import AdfsAuthBackend
     provider_config = AdfsProviderConfig()
-    provider_config.load_config()
+    provider_config.load_remote_config()
     return AdfsAuthBackend(provider_config=provider_config)

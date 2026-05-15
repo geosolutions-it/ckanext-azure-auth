@@ -18,7 +18,6 @@ from ckanext.azure_auth.constants import (
     ATTR_LOGIN_BUTTON,
     ATTR_LOGIN_LABEL,
     ATTR_METADATA_URL,
-    ATTR_REDIRECT_URL,
     ATTR_TENANT_ID,
     AZURE_AD_SERVER_URL,
     RENDERABLE_ATTRS,
@@ -57,7 +56,6 @@ class AzureAdfsPlugin(plugins.SingletonPlugin):
         azure_auth_plugin_defaults = (
             (ATTR_METADATA_URL, 'https://login.microsoftonline.com/'),
             (ATTR_AUTH_CALLBACK_PATH, '/oauth2/callback'),
-            (ATTR_REDIRECT_URL, config['ckan.site_url'] + config[ATTR_AUTH_CALLBACK_PATH]),
             (ATTR_FORCE_MFA, False),
             (ATTR_DISABLE_SSO, False),
             (f'{_EXTNAME}.config_reload_interval', 24),
@@ -98,7 +96,7 @@ class AzureAdfsPlugin(plugins.SingletonPlugin):
 
         try:
             provider_config = AdfsProviderConfig()
-            provider_config.load_config()
+            provider_config.load_remote_config()
             adfs_authentication_endpoint_error = ''
             adfs_authentication_endpoint = provider_config.build_authorization_endpoint()
         except RuntimeError as err:

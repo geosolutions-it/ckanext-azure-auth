@@ -3,31 +3,38 @@ Shared abstract base classes for Azure auth provider configuration.
 """
 from abc import ABC, abstractmethod
 
+from ckan.common import config
 
-class BaseProviderConfig(ABC):
+from ckanext.azure_auth.constants import (
+    ATTR_SERVICE_DOMAIN,
+    ATTR_SERVICE_ID,
+    ATTR_TENANT_ID,
+    ATTR_POLICY,
+    ATTR_CLIENT_ID,
+    ATTR_AUTH_CALLBACK_PATH,
+    ATTR_SCOPE
+)
+
+
+class BaseProviderConfig:
     """Abstract base class for provider configuration."""
 
-    authorization_endpoint = None
-    """URL of the OAuth2/OIDC authorization endpoint."""
+    def __init__(self, ckan_config):
+        self.service_domain = ckan_config.get(ATTR_SERVICE_DOMAIN)
+        self.service_id = ckan_config.get(ATTR_SERVICE_ID)
+        self.tenant_id = ckan_config.get(ATTR_TENANT_ID)
+        self.policy = ckan_config.get(ATTR_POLICY)
+        self.scope = ckan_config.get(ATTR_SCOPE)
+        self.client_id = ckan_config.get(ATTR_CLIENT_ID)
+        self.auth_callback_path = ckan_config.get(ATTR_AUTH_CALLBACK_PATH)
 
-    token_endpoint = None
-    """URL of the token exchange endpoint."""
-
-    end_session_endpoint = None
-    """URL for ending the user's SSO session."""
-
-    issuer = None
-    """Expected token issuer (iss claim value)."""
-
-    session = None
-    """HTTP session used for requests to the identity provider."""
-
-    @abstractmethod
-    def load_config(self):
+    def load_remote_config(self):
         """Load the provider configuration (endpoints, keys, etc.)."""
-        pass
+        raise NotImplementedError()
 
-    @abstractmethod
     def build_authorization_endpoint(self):
         """Return the authorization URL to redirect the user to."""
-        pass
+        raise NotImplementedError()
+
+    def get_redirect_url(self):
+        return config['ckan.site_url'] + self.auth_callback_path

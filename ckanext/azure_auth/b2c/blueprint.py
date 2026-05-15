@@ -6,6 +6,7 @@ import logging
 from functools import partial
 
 from flask import Blueprint, request, session
+
 from ckan.lib.helpers import flash_error
 
 from ckan.lib import base
@@ -16,21 +17,13 @@ from ckan import logic
 import ckan.plugins.toolkit as toolkit
 
 from ckanext.azure_auth.b2c.backend import B2CAuthBackend
-from ckanext.azure_auth.b2c.config import B2CProviderConfig
+from ckanext.azure_auth.b2c.config import b2c_config
 from ckanext.azure_auth.constants import (
     ADFS_SESSION_PREFIX,
     ATTR_AUTH_CALLBACK_PATH,
-    ATTR_CLIENT_ID,
     ATTR_LOGIN_BUTTON,
     ATTR_LOGIN_LABEL,
-    ATTR_POLICY,
-    ATTR_REDIRECT_URL,
-    ATTR_SERVICE_DOMAIN,
-    ATTR_SERVICE_ID,
-    ATTR_SPIDL,
-    ATTR_TENANT_ID,
 )
-from ckanext.azure_auth.exceptions import CreateUserException
 
 log = logging.getLogger(__name__)
 
@@ -80,20 +73,6 @@ def azure_auth_config():
 b2c_auth_blueprint = Blueprint('azure_auth', __name__)
 
 
-def _get_auth_backend():
-    provider_config = B2CProviderConfig(
-        service_domain=config.get(ATTR_SERVICE_DOMAIN),
-        service_id=config.get(ATTR_SERVICE_ID),
-        tenant_id=config.get(ATTR_TENANT_ID),
-        policy=config.get(ATTR_POLICY),
-        client_id=config.get(ATTR_CLIENT_ID),
-        redirect_uri=config.get(ATTR_REDIRECT_URL),
-        spidl=config.get(ATTR_SPIDL),
-    )
-    provider_config.load_config()
-    return B2CAuthBackend(provider_config=provider_config)
-
-
 @b2c_auth_blueprint.route('/azure/login', methods=['POST'], endpoint='login')
 def token_login():
     try:
@@ -102,7 +81,13 @@ def token_login():
             flash_error("No token found")
             return base.render("user/login.html")
 
-        user_dict = _get_auth_backend().process_access_token(id_token)
+        access_token = request.form.get('access_token')
+
+        if log.isEnabledFor(logging.DEBUG):
+            log.debug(f"Full id token received: {id_token}")
+            log.debug(f"Full access token received: {access_token if access_token else 'None'}")
+
+        user_dict = B2CAuthBackend(b2c_config).process_tokens(id_token, access_token)
 
         user_obj = model.User.get(user_dict['name'])
         if not user_obj:
@@ -118,7 +103,7 @@ def token_login():
 
     except Exception as e:
         user_msg = str(e)
-        log.exception(f"Azure Login process failed: {user_msg}")
+        log.exception(f"Azure Login process failed: {user_msg}", exc_info=True)
         flash_error(user_msg)
         return base.render("user/login.html", {})
 
@@ -128,10 +113,9 @@ def logout():
     userobj = getattr(g, 'userobj', None)
 
     if userobj and userobj.name.startswith(('adfs-', 'b2c-')):
-        log.info(f"Azure logout for {userobj.name}")
+        log.debug(f"Azure logout for {userobj.name}")
         toolkit.logout_user()
-        backend = _get_auth_backend()
-        azure_logout_url = backend.provider_config.build_logout_endpoint()
+        azure_logout_url = b2c_config.build_logout_endpoint()
         return toolkit.redirect_to(azure_logout_url)
 
     toolkit.logout_user()

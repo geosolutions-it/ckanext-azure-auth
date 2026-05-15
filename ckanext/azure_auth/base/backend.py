@@ -5,21 +5,17 @@ import logging
 import re
 from abc import ABC, abstractmethod
 
+from ckan.common import config
 from ckan.lib.munge import substitute_ascii_equivalents
 from ckan.plugins import toolkit
 
-from ckanext.azure_auth.base.config import BaseProviderConfig
+from ckanext.azure_auth.constants import ATTR_USER_ID_TEMPLATE, ATTR_MAIL_CLAIMS, ATTR_AUTH_CALLBACK_PATH
 
 log = logging.getLogger(__name__)
 
 
 class BaseAuthBackend(ABC):
     """Abstract base class for authentication backends."""
-
-    provider_config: BaseProviderConfig
-
-    def __init__(self, provider_config):
-        self.provider_config = provider_config
 
     @staticmethod
     def _get_fixed_user_schema():
@@ -55,12 +51,24 @@ class BaseAuthBackend(ABC):
         tag = re.sub(r'[^a-zA-Z0-9\- ]', '', tag).replace(' ', '-')
         return tag
 
-    @abstractmethod
-    def get_or_create_user(self, claims):
-        """Create or retrieve a CKAN user from token claims."""
-        pass
+    def _build_user_id(self, claims: dict):
+        user_id_template = config.get(ATTR_USER_ID_TEMPLATE)
+        if not user_id_template:
+            raise RuntimeError("User ID template not configured")
+        try:
+            external_id = user_id_template.format_map(claims)
+            return external_id.strip('"').lower()
+        except KeyError as e:
+            log.error(f"Missing required claim {e}")
+            raise PermissionError
 
-    @abstractmethod
-    def process_access_token(self, *args, **kwargs):
-        """Validate a token and return the corresponding CKAN user."""
-        pass
+    def _discover_mail(self, claims: dict):
+        mail_claims_cfg = config.get(ATTR_MAIL_CLAIMS, "email") or "email"
+        mail_claim_list = [c.strip() for c in mail_claims_cfg.split(",") if c.strip()]
+
+        for claim_name in mail_claim_list:
+            value = claims.get(claim_name)
+            if value:
+                return value
+        return None
+

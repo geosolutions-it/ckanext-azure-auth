@@ -1,6 +1,7 @@
 """
 Azure B2C (MyIdentity) authentication backend.
 """
+import importlib
 import logging
 
 from jwt import decode, PyJWKClient
@@ -8,13 +9,13 @@ from jwt.exceptions import InvalidTokenError
 
 from ckan.common import config, session, asbool
 from ckan.logic import NotFound, get_action
+from ckanext.azure_auth.b2c.config import B2CProviderConfig
 
 from ckanext.azure_auth.base.backend import BaseAuthBackend
 from ckanext.azure_auth.constants import (
     ADFS_SESSION_PREFIX,
     ATTR_CREATE_USER,
-    ATTR_MAIL_CLAIMS,
-    ATTR_USER_ID_TEMPLATE,
+    ATTR_CUSTOM_USER_FUNC,
 )
 from ckanext.azure_auth.exceptions import CreateUserException
 
@@ -24,41 +25,31 @@ log = logging.getLogger(__name__)
 class B2CAuthBackend(BaseAuthBackend):
     """Authentication backend for Azure B2C using implicit flow (id_token)."""
 
-    def process_access_token(self, id_token):
+    provider_config: B2CProviderConfig
+
+    def __init__(self, provider_config:B2CProviderConfig):
+        self.provider_config = provider_config
+
+    def process_tokens(self, id_token, access_token=None):
         """Process an Azure B2C id_token directly."""
         if not id_token:
             raise PermissionError("No id_token provided")
 
-        log.debug(f'Received id_token: {id_token}')
-
-        claims = self.execute_token_validation(id_token)
+        claims = self.decode_id_token(id_token)
 
         if not claims:
             raise PermissionError("Invalid id_token")
 
         log.debug(f'Decoded claims: {claims}')
-        return self.get_or_create_user(claims)
+        return self.get_or_create_user(claims, access_token)
 
-    def authenticate_with_id_token(self, id_token: str):
-        """Authenticate a user using the id_token from Azure B2C implicit flow."""
-        if not id_token:
-            log.debug("No id_token received from Azure B2C")
-            return None
-
-        claims = self.execute_token_validation(id_token)
-
-        if not claims:
-            raise PermissionError("Invalid id_token received")
-
-        log.debug(f"Decoded claims from id_token: {claims}")
-        return self.get_or_create_user(claims)
-
-    def validate_id_token(self, id_token: str, expected_nonce: str):
+    def decode_id_token(self, id_token: str) -> dict:
         """Validate an Azure B2C ID token using PyJWKClient."""
         if not id_token:
             raise PermissionError("No id_token provided")
 
-        jwk_client = PyJWKClient(self.provider_config.jwks_uri)
+        oidc_cfg = self.provider_config.get_remote_config()
+        jwk_client = PyJWKClient(oidc_cfg.jwks_uri)
 
         try:
             signing_key = jwk_client.get_signing_key_from_jwt(id_token).key
@@ -68,7 +59,7 @@ class B2CAuthBackend(BaseAuthBackend):
                 key=signing_key,
                 algorithms=["RS256"],
                 audience=self.provider_config.client_id,
-                issuer=self.provider_config.issuer,
+                issuer=oidc_cfg.issuer,
                 options={
                     "require": ["exp", "iss", "aud", "nonce"],
                     "verify_signature": True,
@@ -82,7 +73,7 @@ class B2CAuthBackend(BaseAuthBackend):
             )
 
         except InvalidTokenError as e:
-            log.info(f"ID token validation failed: {e}")
+            log.warning(f"ID token validation failed: {e}")
             raise PermissionError("Invalid id_token")
 
         # Validate nonce
@@ -100,49 +91,13 @@ class B2CAuthBackend(BaseAuthBackend):
 
         return claims
 
-    def execute_token_validation(self, id_token):
-        from flask import has_request_context, session as flask_session
-
-        if has_request_context():
-            expected_nonce = flask_session.get(f"{ADFS_SESSION_PREFIX}nonce")
-        else:
-            expected_nonce = None
-
-        return self.validate_id_token(id_token, expected_nonce)
-
-    def get_or_create_user(self, claims):
+    def get_or_create_user(self, claims, access_token=None):
         """Create or update a CKAN user from Azure B2C claims."""
-        user_id_template = config.get(ATTR_USER_ID_TEMPLATE)
 
-        if not user_id_template:
-            raise RuntimeError("User ID template not configured")
+        ckan_id = username = self._build_user_id(claims)
+        email = self._discover_mail(claims)
 
-        try:
-            external_id = user_id_template.format_map(claims)
-            external_id = external_id.strip('"').lower()
-        except KeyError as e:
-            log.error(f"Missing required claim {e}")
-            raise PermissionError
-
-        mail_claims_cfg = config.get(ATTR_MAIL_CLAIMS, "email") or "email"
-        mail_claim_list = [c.strip() for c in mail_claims_cfg.split(",") if c.strip()]
-
-        email = None
-        for claim_name in mail_claim_list:
-            value = claims.get(claim_name)
-            if value:
-                email = value
-                break
-
-        username = f"{external_id}"
-        fullname = f"{claims.get('given_name', '')} {claims.get('family_name', '')}".strip()
-        if not fullname:
-            fullname = username
-
-        custom_context = {
-            "ignore_auth": True,
-            "schema": self._get_fixed_user_schema()
-        }
+        fullname = f"{claims.get('given_name', '')} {claims.get('family_name', '')}".strip() or username
 
         try:
             user = get_action("user_show")(
@@ -159,35 +114,65 @@ class B2CAuthBackend(BaseAuthBackend):
                 dirty = True
 
             if dirty:
-                get_action("user_update")(custom_context, user)
+                get_action("user_update")(
+                    {
+                        "ignore_auth": True,
+                        "schema": self._get_fixed_user_schema()
+                    },
+                    user)
+
+            return user
 
         except NotFound:
-            if asbool(config.get(ATTR_CREATE_USER, False)):
-                if not email:
-                    msg = (
-                        f"User '{username}' doesn't exist and "
-                        f"email claim is missing, cannot create user."
-                    )
-                    log.error(msg)
-                    raise PermissionError(msg)
-                user = get_action("user_create")(
-                    custom_context,
-                    {
-                        "name": username,
-                        "fullname": fullname,
-                        "email": email,
-                        "plugin_extras": {
-                            "azure_auth": external_id
-                        }
-                    }
-                )
-                log.debug(f"User created --> {user['id']}")
-            else:
-                msg = (
-                    f"User '{username}' does not exist and "
-                    f"user auto-creation is disabled"
-                )
-                log.error(msg)
+            return self.create_user(claims, username, fullname, email, access_token)
+
+    def create_user(self, claims, username, fullname, email, access_token=None):
+            if not asbool(config.get(ATTR_CREATE_USER, False)):
+                msg = f"User auto-creation is disabled. Authenticated user '{username}' will not be created."
+                log.warning(msg)
                 raise CreateUserException(msg)
 
-        return user
+            user_dict = {
+                    "name": username,
+                    "fullname": fullname,
+                    "email": email,
+                    "plugin_extras": {
+                        "azure_auth": username
+                    }
+                }
+
+            # hook to update user info if needed (e.g. call backend services to fill in missing email or other info)
+            self.customize_user_data(user_dict, claims, access_token)
+
+            if not user_dict["email"]:
+                msg = f"Missing email claim for user '{username}'. User cannot be created."
+                log.error(msg)
+                raise PermissionError(msg)
+
+            user = get_action("user_create")(
+                { # context
+                    "ignore_auth": True,
+                    "schema": self._get_fixed_user_schema()
+                },
+                user_dict
+            )
+            log.debug(f"User created --> {user['id']}")
+            return user
+
+    def customize_user_data(self, user_dict: dict, claims: dict, access_token: str):
+        custom_user_func = config.get(ATTR_CUSTOM_USER_FUNC, None)
+        if not custom_user_func:
+            return
+
+        log.debug(f"Running user data custom function {custom_user_func}...")
+        module_path, function_name = custom_user_func.rsplit('.', 1)
+        module = importlib.import_module(module_path)
+        func = getattr(module, function_name)
+        try:
+            func(user_dict, claims, access_token)
+        except PermissionError as e:
+            # This is the only expected exception, its message will be flashed on the UI
+            raise
+        except Exception as e:
+            log.error(f"Error customizing user data: {e}", exc_info=True)
+            raise

@@ -6,21 +6,14 @@ import ckan.plugins as plugins
 import ckan.plugins.toolkit as toolkit
 
 from ckanext.azure_auth.b2c.blueprint import b2c_auth_blueprint, azure_admin_blueprint
-from ckanext.azure_auth.b2c.config import B2CProviderConfig
+from ckanext.azure_auth.b2c.config import b2c_config
 from ckanext.azure_auth.constants import (
     ADFS_SESSION_PREFIX,
     ATTR_AUTH_CALLBACK_PATH,
-    ATTR_CLIENT_ID,
     ATTR_LOGIN_BUTTON,
     ATTR_LOGIN_LABEL,
-    ATTR_POLICY,
-    ATTR_REDIRECT_URL,
-    ATTR_SERVICE_DOMAIN,
-    ATTR_SERVICE_ID,
     ATTR_SPIDL,
-    ATTR_TENANT_ID,
     RENDERABLE_ATTRS,
-    _EXTNAME,
 )
 
 log = logging.getLogger(__name__)
@@ -41,8 +34,7 @@ class AzureB2CPlugin(plugins.SingletonPlugin):
         toolkit.add_ckan_admin_tab(config, 'azure_admin.azure_auth_config', 'Azure B2C', icon='windows')
 
         b2c_defaults = (
-            (ATTR_AUTH_CALLBACK_PATH, '/oauth2/callback'),
-            (ATTR_REDIRECT_URL, config['ckan.site_url'] + config.get(ATTR_AUTH_CALLBACK_PATH, '/oauth2/callback')),
+            (ATTR_AUTH_CALLBACK_PATH, '/azure/signin'),
             (ATTR_SPIDL, '2'),
         )
         for k, d in b2c_defaults:
@@ -77,20 +69,9 @@ class AzureB2CPlugin(plugins.SingletonPlugin):
                 raise NotAuthorized('Attribute is not accessible')
             return get_action('config_option_show')({'ignore_auth': True}, {'key': key})
 
-        from ckan.common import config as ckan_config
         try:
-            provider_config = B2CProviderConfig(
-                service_domain=ckan_config.get(ATTR_SERVICE_DOMAIN),
-                service_id=ckan_config.get(ATTR_SERVICE_ID),
-                tenant_id=ckan_config.get(ATTR_TENANT_ID),
-                policy=ckan_config.get(ATTR_POLICY),
-                client_id=ckan_config.get(ATTR_CLIENT_ID),
-                redirect_uri=ckan_config.get(ATTR_REDIRECT_URL),
-                spidl=ckan_config.get(ATTR_SPIDL),
-            )
-            provider_config.load_config()
             adfs_authentication_endpoint_error = ''
-            adfs_authentication_endpoint = provider_config.build_authorization_endpoint()
+            adfs_authentication_endpoint = b2c_config.build_authorization_endpoint()
         except RuntimeError as err:
             log.critical(err)
             adfs_authentication_endpoint = False

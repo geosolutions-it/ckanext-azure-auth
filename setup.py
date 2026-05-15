@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name='ckanext-azure-auth',
-    version='0.0.1',
+    version='0.9.9',
     description='ADFS Authentication',
     long_description="""
     Integrates with ADFS Authentication
