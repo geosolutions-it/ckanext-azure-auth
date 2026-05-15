@@ -41,7 +41,7 @@ class AdfsAuthBackend(BaseAuthBackend):
         data = {
             "grant_type": "authorization_code",
             "client_id": config[ATTR_CLIENT_ID],
-            "redirect_uri": self._get_redirect_url(),
+            "redirect_uri": self.provider_config.get_redirect_url(),
             "code": authorization_code,
         }
         if config[ATTR_CLIENT_SECRET]:

@@ -55,8 +55,9 @@ class BaseAuthBackend(ABC):
             external_id = user_id_template.format_map(claims)
             return external_id.strip('"').lower()
         except KeyError as e:
-            log.error(f"Missing required claim {e}")
-            raise PermissionError
+            msg = f"Missing required claim {e}"
+            log.error(msg)
+            raise PermissionError(msg)
 
     def _discover_mail(self, claims: dict):
         mail_claims_cfg = config.get(ATTR_MAIL_CLAIMS, "email") or "email"

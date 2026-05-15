@@ -93,7 +93,7 @@ def logout():
 
 def login_callback():
     """Handle the OAuth2 authorization-code callback from ADFS / Azure AD."""
-    code = request.params.get("code")
+    code = request.values.get("code")
     provider_config = AdfsProviderConfig(config)
     auth_backend = AdfsAuthBackend(provider_config=provider_config)
 

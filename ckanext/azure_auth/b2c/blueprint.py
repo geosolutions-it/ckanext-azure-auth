@@ -81,7 +81,7 @@ b2c_auth_blueprint = Blueprint("azure_auth", __name__)
 @b2c_auth_blueprint.route("/azure/login", methods=["POST"], endpoint="login")
 def token_login():
     def _trunc_token(token):
-        return f"{token[:10]}...{token[-10:]}" if token else None
+        return f"{token[:8]}...{token[-8:]}" if token else None
 
     try:
         id_token = request.form.get("id_token")

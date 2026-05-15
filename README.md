@@ -59,7 +59,6 @@ And these settings:
 
     [app:main]
 
-    ckanext.azure_auth.auth_service_type = adfs
     ckanext.azure_auth.tenant_id = <..uuid..>
     ckanext.azure_auth.client_id = <..uuid..>
     ckanext.azure_auth.audience = <..uuid..>
@@ -72,11 +71,16 @@ And these settings:
     # Whether to disable single sign-on and force the ADFS server to show a login prompt.
     ckanext.azure_auth.disable_sso = False
 
+    # String template to generate the CKAN user_id from the JWT claims
+    ckanext.azure_auth.user_id_template="{your_claim_name}"
+
     # Comma-separated list of JWT claim names to try when resolving the user's email address.
-    # The first claim that is present and non-empty will be used.
     # If this setting is not provided, the default claim "email" is used.
     # Example for multiple fallback claims:
     # ckanext.azure_auth.claim.mail = preferred_username, upn, email
+    # Callback path; the full URL should be whitelisted on the identity service
+    # By default it's /azure/signin; modify only if you have issues in whitelisting
+    # ckanext.azure_auth.auth_callback_path =  /azure/signin
 
 
 If you have specific `server_ad`, please remove:
@@ -88,12 +92,6 @@ and add:
      ckanext.azure_auth.ad_server = <.. http//uyour.server.domain.name ..>
 
 Default `ad_server` name is `http://login.microsoftonline.com`
-
-
-For the local environment you can setup callback url like that:
-
-    ckanext.azure_auth.redirect_uri =   http://localhost/azure/signin
-    ckanext.azure_auth.auth_callback_path =  /azure/signin
 
 
 * ad_server - link to https://login.microsoftonline.com or company AD directory
@@ -133,7 +131,7 @@ These are the settings for B2C, to be added inside the `[app:main]` section:
     ckanext.azure_auth.response_type = id_token
 
     # String template to generate the CKAN user_id from the JWT claims
-    ckanext.azure_auth.user_id_template="{extension_fiscalNumber}
+    ckanext.azure_auth.user_id_template="{your_claim_name}"
 
     # Allow plugin to create new users in CKAN
     ckanext.azure_auth.allow_create_users = True

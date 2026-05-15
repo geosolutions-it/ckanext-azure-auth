@@ -2,8 +2,6 @@
 Shared abstract base classes for Azure auth provider configuration.
 """
 
-from abc import ABC, abstractmethod
-
 from ckan.common import config
 
 from ckanext.azure_auth.constants import (
@@ -20,7 +18,7 @@ from ckanext.azure_auth.constants import (
 
 
 class BaseProviderConfig:
-    """Abstract base class for provider configuration."""
+    """Base class for provider configuration."""
 
     def __init__(self, ckan_config):
         self.service_domain = ckan_config.get(ATTR_SERVICE_DOMAIN)
