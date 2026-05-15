@@ -23,6 +23,7 @@ from ckanext.azure_auth.constants import (
     ATTR_AUTH_CALLBACK_PATH,
     ATTR_LOGIN_LABEL,
     ATTR_LOGIN_BUTTON,
+    DEFAULT_CALLBACK_PATH,
 )
 from ckanext.azure_auth.exceptions import (
     AzureReloginRequiredException,
@@ -130,6 +131,6 @@ def login_callback():
 
 
 adfs_auth_blueprint.add_url_rule(
-    rule=config[ATTR_AUTH_CALLBACK_PATH],
+    rule=config.get(ATTR_AUTH_CALLBACK_PATH, DEFAULT_CALLBACK_PATH),
     view_func=login_callback
 )

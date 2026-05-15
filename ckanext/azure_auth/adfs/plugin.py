@@ -95,7 +95,7 @@ class AzureAdfsPlugin(plugins.SingletonPlugin):
             return get_action('config_option_show')({'ignore_auth': True}, {'key': key})
 
         try:
-            provider_config = AdfsProviderConfig()
+            provider_config = AdfsProviderConfig(ckan_config)
             provider_config.load_remote_config()
             adfs_authentication_endpoint_error = ''
             adfs_authentication_endpoint = provider_config.build_authorization_endpoint()

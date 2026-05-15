@@ -99,9 +99,8 @@ class B2CProviderConfig(BaseProviderConfig):
         if self.spidl:
             query['spidl'] = self.spidl
 
-        url = f"{oidc_cfg.authorization_endpoint}&{urlencode(query)}"
-        log.info(f"B2C authorization URL: {url}")
-        return url
+        log.info("B2C authorization endpoint: %s", oidc_cfg.authorization_endpoint)
+        return f"{oidc_cfg.authorization_endpoint}&{urlencode(query)}"
 
     def build_logout_endpoint(self):
         """Construct the B2C logout URL dynamically."""

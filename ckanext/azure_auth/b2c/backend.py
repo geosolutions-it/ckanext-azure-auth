@@ -127,37 +127,37 @@ class B2CAuthBackend(BaseAuthBackend):
             return self.create_user(claims, username, fullname, email, access_token)
 
     def create_user(self, claims, username, fullname, email, access_token=None):
-            if not asbool(config.get(ATTR_CREATE_USER, False)):
-                msg = f"User auto-creation is disabled. Authenticated user '{username}' will not be created."
-                log.warning(msg)
-                raise CreateUserException(msg)
+        if not asbool(config.get(ATTR_CREATE_USER, False)):
+            msg = f"User auto-creation is disabled. Authenticated user '{username}' will not be created."
+            log.warning(msg)
+            raise CreateUserException(msg)
 
-            user_dict = {
-                    "name": username,
-                    "fullname": fullname,
-                    "email": email,
-                    "plugin_extras": {
-                        "azure_auth": username
-                    }
+        user_dict = {
+                "name": username,
+                "fullname": fullname,
+                "email": email,
+                "plugin_extras": {
+                    "azure_auth": username
                 }
+            }
 
-            # hook to update user info if needed (e.g. call backend services to fill in missing email or other info)
-            self.customize_user_data(user_dict, claims, access_token)
+        # hook to update user info if needed (e.g. call backend services to fill in missing email or other info)
+        self.customize_user_data(user_dict, claims, access_token)
 
-            if not user_dict["email"]:
-                msg = f"Missing email claim for user '{username}'. User cannot be created."
-                log.error(msg)
-                raise PermissionError(msg)
+        if not user_dict["email"]:
+            msg = f"Missing email claim for user '{username}'. User cannot be created."
+            log.error(msg)
+            raise PermissionError(msg)
 
-            user = get_action("user_create")(
-                { # context
-                    "ignore_auth": True,
-                    "schema": self._get_fixed_user_schema()
-                },
-                user_dict
-            )
-            log.debug(f"User created --> {user['id']}")
-            return user
+        user = get_action("user_create")(
+            { # context
+                "ignore_auth": True,
+                "schema": self._get_fixed_user_schema()
+            },
+            user_dict
+        )
+        log.debug(f"User created --> {user['id']}")
+        return user
 
     def customize_user_data(self, user_dict: dict, claims: dict, access_token: str):
         custom_user_func = config.get(ATTR_CUSTOM_USER_FUNC, None)

@@ -11,7 +11,7 @@ from ckanext.azure_auth.constants import (
     ADFS_SESSION_PREFIX,
     ATTR_LOGIN_BUTTON,
     ATTR_LOGIN_LABEL,
-    RENDERABLE_ATTRS,
+    RENDERABLE_ATTRS, ATTR_AUTH_CALLBACK_PATH,
 )
 
 log = logging.getLogger(__name__)

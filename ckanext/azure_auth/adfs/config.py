@@ -193,7 +193,7 @@ class AdfsProviderConfig(BaseProviderConfig):
         query = {
             'response_type': 'code',
             'client_id': config[ATTR_CLIENT_ID],
-            'redirect_uri': config[ATTR_REDIRECT_URL],
+            'redirect_uri': self.get_redirect_url(),
             'state': redirect_to,
         }
 

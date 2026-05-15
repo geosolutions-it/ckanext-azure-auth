@@ -39,5 +39,7 @@ ATTR_LOGIN_BUTTON = f'{_EXTNAME}.login_button'
 
 RENDERABLE_ATTRS = (ATTR_LOGIN_LABEL, ATTR_LOGIN_BUTTON)
 
+DEFAULT_CALLBACK_PATH = '/azure/signin'
+
 # Kept for convenience — also available at ckanext.azure_auth.adfs.config.TIMEOUT
 TIMEOUT = 120

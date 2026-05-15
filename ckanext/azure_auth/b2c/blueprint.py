@@ -23,6 +23,7 @@ from ckanext.azure_auth.constants import (
     ATTR_AUTH_CALLBACK_PATH,
     ATTR_LOGIN_BUTTON,
     ATTR_LOGIN_LABEL,
+    DEFAULT_CALLBACK_PATH,
 )
 
 log = logging.getLogger(__name__)
@@ -75,6 +76,9 @@ b2c_auth_blueprint = Blueprint('azure_auth', __name__)
 
 @b2c_auth_blueprint.route('/azure/login', methods=['POST'], endpoint='login')
 def token_login():
+    def _trunc_token(token):
+        return f"{token[:10]}...{token[-10:]}" if token else None
+
     try:
         id_token = request.form.get('id_token')
         if not id_token:
@@ -84,8 +88,8 @@ def token_login():
         access_token = request.form.get('access_token')
 
         if log.isEnabledFor(logging.DEBUG):
-            log.debug(f"Full id token received: {id_token}")
-            log.debug(f"Full access token received: {access_token if access_token else 'None'}")
+            log.debug(f"Full id token received: {_trunc_token(id_token)}")
+            log.debug(f"Full access token received: {_trunc_token(access_token)}")
 
         user_dict = B2CAuthBackend(b2c_config).process_tokens(id_token, access_token)
 
@@ -128,6 +132,6 @@ def login_callback():
 
 
 b2c_auth_blueprint.add_url_rule(
-    rule=config[ATTR_AUTH_CALLBACK_PATH],
+    rule=config.get(ATTR_AUTH_CALLBACK_PATH, DEFAULT_CALLBACK_PATH),
     view_func=login_callback
 )
