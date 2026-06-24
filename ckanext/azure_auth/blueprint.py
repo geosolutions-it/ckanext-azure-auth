@@ -1,159 +1,20 @@
-# encoding: utf-8
-from functools import partial
-import logging
+"""
+Compatibility shim — blueprints have moved to ckanext.azure_auth.{adfs,b2c}.blueprint.
+"""
 
-from flask import (
-    Blueprint,
-    request,
-    session,
-    flash,
-    )
-
-from ckan.lib.helpers import flash_error
-from ckan.plugins import toolkit
-
-from ckan import logic
-from ckan.common import config, g, _, c
-import ckan.lib.base as base
-import ckan.lib.helpers as helpers
-from ckan.logic import get_action
-import ckan.model as model
-
-import ckanext.azure_auth.controllers as controllers
-from ckanext.azure_auth.auth_config import (
-    ATTR_AUTH_CALLBACK_PATH,
-    ATTR_LOGIN_LABEL,
-    ATTR_LOGIN_BUTTON,
-    ADFS_SESSION_PREFIX, ATTR_TENANT_ID, ATTR_CLIENT_ID, ATTR_SERVICE_DOMAIN, ATTR_POLICY, ATTR_REDIRECT_URL,
-    ATTR_SPIDL, ATTR_SERVICE_ID
+from ckan.common import config as ckan_config
+from ckanext.azure_auth.adfs.blueprint import (  # noqa: F401
+    adfs_auth_blueprint as azure_auth_blueprint,
+    azure_admin_blueprint,
+    login_callback,
 )
-from ckanext.azure_auth.auth_backend import B2CAuthBackend
-from ckanext.azure_auth.auth_config import B2CProviderConfig
-from ckanext.azure_auth.exceptions import CreateUserException
+from ckanext.azure_auth.adfs.config import AdfsProviderConfig
 
-# Initialize logger
-log = logging.getLogger(__name__)
-
-azure_admin_blueprint = Blueprint(u'azure_admin', __name__)
-
-
-def build_extra_admin_nav():
-    u'''Return results of helpers.build_extra_admin_nav for testing.'''
-    return helpers.build_extra_admin_nav()
 
 def get_auth_backend():
-    tenant_id = config.get(ATTR_TENANT_ID)
-    client_id = config.get(ATTR_CLIENT_ID)
-    service_domain = config.get(ATTR_SERVICE_DOMAIN)
-    service_id = config.get(ATTR_SERVICE_ID)
-    policy = config.get(ATTR_POLICY)
-    redirect_uri = config.get(ATTR_REDIRECT_URL)
-    spidl = config.get(ATTR_SPIDL)
+    """Deprecated helper kept for back-compat. Creates an ADFS backend."""
+    from ckanext.azure_auth.adfs.backend import AdfsAuthBackend
 
-    provider_config = B2CProviderConfig(
-        service_domain=service_domain,
-        service_id=service_id,
-        tenant_id=tenant_id,
-        policy=policy,
-        client_id=client_id,
-        redirect_uri=redirect_uri,
-        spidl = spidl,
-    )
-
-    provider_config.load_config()
-
-    return B2CAuthBackend(provider_config=provider_config)
-
-
-azure_admin_blueprint.add_url_rule(
-    u'/build_extra_admin_nav',
-    view_func=build_extra_admin_nav
-)
-
-
-@azure_admin_blueprint.before_request
-def check_for_sysadmin():
-    try:
-        context = dict(model=model, user=g.user, auth_user_obj=g.userobj)
-        logic.check_access(u'sysadmin', context)
-    except logic.NotAuthorized:
-        base.abort(403, _(u'Need to be system administrator to administer'))
-
-
-@azure_admin_blueprint.route(u'/ckan-admin/azure_auth', methods=['POST', 'GET'])
-def azure_auth_config():
-    configurable_keys = (ATTR_LOGIN_LABEL, ATTR_LOGIN_BUTTON, )
-
-    if request.method == "POST":
-        values = {k: request.values.get(k) for k in configurable_keys if k in request.values}
-        get_action('config_option_update')({}, values)
-
-    elif request.method == "GET":
-        get = partial(get_action('config_option_show'), {})
-        values = {k: get({'key': k}) for k in configurable_keys}
-        values = {k: values[k] for k in configurable_keys if values[k]}
-
-    return base.render(
-        u'admin/azure_auth_config.html',
-        extra_vars={
-            'data': values,
-            'errors': {},
-            'title': u'ADFS configuration'}
-    )
-
-azure_auth_blueprint = Blueprint(u'azure_auth', __name__)
-
-@azure_auth_blueprint.route('/azure/login', methods=['POST'], endpoint='login')
-def token_login():
-    try:
-        id_token = request.form.get('id_token')
-        if not id_token:
-            flash_error("No token found")
-            return base.render("user/login.html")
-
-        user_dict = get_auth_backend().process_access_token(id_token)
-
-        # Get the CKAN User object
-        user_obj = model.User.get(user_dict['name'])
-        if not user_obj:
-            flash_error("User not found")
-            return base.render("user/login.html")
-
-        # Log in CKAN properly
-        toolkit.login_user(user_obj)
-
-        session[f'{ADFS_SESSION_PREFIX}user'] = user_dict['name']
-        session.save()
-
-        return toolkit.redirect_to('/')
-
-    except Exception as e:
-        user_msg = str(e)
-        log.exception(f"Azure Login process failed: {user_msg}")
-        flash_error(user_msg)
-        return base.render("user/login.html", {})
-
-
-@azure_auth_blueprint.route('/user/_logout')
-def logout():
-    userobj = getattr(g, 'userobj', None)
-
-    if userobj and userobj.name.startswith(('adfs-', 'b2c-')):
-        log.info(f"Azure logout for {userobj.name}")
-
-        # Logout CKAN session
-        toolkit.logout_user()
-
-        # Redirect to Azure logout
-        backend = get_auth_backend()
-        azure_logout_url = backend.provider_config.build_logout_endpoint()
-        return toolkit.redirect_to(azure_logout_url)
-
-    # For local CKAN users
-    toolkit.logout_user()
-    return toolkit.redirect_to('/')
-
-azure_auth_blueprint.add_url_rule(
-    rule=config[ATTR_AUTH_CALLBACK_PATH],
-    view_func=controllers.login_callback
-)
+    provider_config = AdfsProviderConfig(ckan_config)
+    provider_config.load_remote_config()
+    return AdfsAuthBackend(provider_config=provider_config)

@@ -22,11 +22,19 @@
     form.submit();
 }
 
-  const hash = window.location.hash.substr(1); // remove '#'
+  const hash = window.location.hash.substring(1); // remove '#'
   const params = new URLSearchParams(hash);
-  const id_token = params.get('id_token');
 
-  post_data('{{ h.url_for(controller="azure_auth", action="login") }}', { id_token: id_token });
+  const dataToPost = Object.fromEntries(params.entries());
+  // const id_token = params.get('id_token');
+  // const access_token = params.get('access_token');
+
+  // post_data('{{ h.url_for(controller="azure_auth", action="login") }}', {
+  //   id_token: id_token,
+  //   access_token: access_token
+  // });
+  post_data('{{ h.url_for(controller="azure_auth", action="login") }}', dataToPost);
+
 </script>
 
 <h1>Processing Azure Login...</h1>

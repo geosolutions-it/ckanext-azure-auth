@@ -13,15 +13,7 @@ Features
 
 
 
-Requires python packages:  M2Crypto, pyjwt, xml_python
-
-Linux packages:
-
-    apt install \
-        build-essential \
-        python3-dev \
-        libssl-dev \
-        swig
+Requires python packages:  cryptography, pyjwt, xml_python
 
 What is ADFS?
 -------------
@@ -57,19 +49,16 @@ On the machine hosting your instance of CKAN:
 Ensure all the requirements are installed (see `requirements.txt` for further
 details).
 
-In your CKAN's settings.ini file add inside the [app:main] section `azure_auth` into a `ckan.plugins`:
+In your CKAN's .ini file add inside the `[app:main]` section `azure_auth_adfs` into a `ckan.plugins`:
 
     [app:main]
 
-    ckan.plugins = stats text_view image_view recline_view azure_auth
+    ckan.plugins = stats text_view image_view recline_view azure_auth_adfs
 
 And these settings:
 
     [app:main]
 
-    ckanext.azure_auth.mode = adfs # If you use the ADFS
-    ckanext.azure_auth.auth_service_type = adfs # If you use the adfs 
-    ckanext.azure_auth.wtrealm = <..uuid..>
     ckanext.azure_auth.tenant_id = <..uuid..>
     ckanext.azure_auth.client_id = <..uuid..>
     ckanext.azure_auth.audience = <..uuid..>
@@ -82,11 +71,16 @@ And these settings:
     # Whether to disable single sign-on and force the ADFS server to show a login prompt.
     ckanext.azure_auth.disable_sso = False
 
+    # String template to generate the CKAN user_id from the JWT claims
+    ckanext.azure_auth.user_id_template="{your_claim_name}"
+
     # Comma-separated list of JWT claim names to try when resolving the user's email address.
-    # The first claim that is present and non-empty will be used.
     # If this setting is not provided, the default claim "email" is used.
     # Example for multiple fallback claims:
     # ckanext.azure_auth.claim.mail = preferred_username, upn, email
+    # Callback path; the full URL should be whitelisted on the identity service
+    # By default it's /azure/signin; modify only if you have issues in whitelisting
+    # ckanext.azure_auth.auth_callback_path =  /azure/signin
 
 
 If you have specific `server_ad`, please remove:
@@ -98,12 +92,6 @@ and add:
      ckanext.azure_auth.ad_server = <.. http//uyour.server.domain.name ..>
 
 Default `ad_server` name is `http://login.microsoftonline.com`
-
-
-For the local environment you can setup callback url like that:
-
-    ckanext.azure_auth.redirect_uri =   http://localhost/azure/signin
-    ckanext.azure_auth.auth_callback_path =  /azure/signin
 
 
 * ad_server - link to https://login.microsoftonline.com or company AD directory
@@ -124,41 +112,49 @@ Configure for B2C
 * * Single tenant (example based on this config)
 For more details please follow the official docs [here](https://learn.microsoft.com/en-us/azure/active-directory-b2c/tutorial-register-applications)
 
-In your CKAN's settings file (ckan.ini) file add inside the [app:main] section `azure_auth` into a `ckan.plugins`:
+In your CKAN's .ini file add the plugin `azure_auth_b2c` in the `ckan.plugins` list:
+
+    ckan.plugins = stats text_view image_view recline_view azure_auth_b2c
+
+These are the settings for B2C, to be added inside the `[app:main]` section:
 
     [app:main]
 
-    ckan.plugins = stats text_view image_view recline_view azure_auth
-
-And these settings:
-
-    [app:main]
-
-    ckanext.azure_auth.mode = b2c # If you use the B2C 
-    ckanext.azure_auth.auth_service_type = b2c # If you use the B2C 
-    ckanext.azure_auth.service_domain = <service domain>>
+    # Required settings
+    ckanext.azure_auth.service_domain = <service domain>
     ckanext.azure_auth.tenant_id = <tenant domain>
-    ckanext.azure_auth.client_id = <..uuid..>
+    ckanext.azure_auth.client_id = <uuid>
     ckanext.azure_auth.policy = <policy>
 
-    # Authentication level (spidl)
-    ckanext.azure_auth.spidl = 1 # you can select between level 1, 2 or 3
-    # Definition of the user_id template
-    ckanext.azure_auth.user_id_template="{extension_fiscalNumber}
+    # Optional settings with defaults
+    ckanext.azure_auth.scope = openid
+    ckanext.azure_auth.response_type = id_token
 
-    # Allow plugin to create new users
+    # String template to generate the CKAN user_id from the JWT claims
+    ckanext.azure_auth.user_id_template="{your_claim_name}"
+
+    # Allow plugin to create new users in CKAN
     ckanext.azure_auth.allow_create_users = True
 
-    # Comma-separated list of JWT claim names to try when resolving the user's email address.
-    # The first claim that is present and non-empty will be used.
+    # Comma-separated list of JWT claim names to try in sequence when resolving the user's email address.
     # If this setting is not provided, the default claim "email" is used.
-    ckanext.azure_auth.claim.mail = email
+    # ckanext.azure_auth.claim.mail = email
 
+    # Custom function to call after successful authentication, for example to fetch additional user data from external services
+    # ckanext.azure_auth.custom_user_func = ckanext.your_extension.your_module.your_function
 
-For the local environment you can setup callback url like that:
+    # Authentication level (spidl)
+    ckanext.azure_auth.spidl = 2
 
-    ckanext.azure_auth.redirect_uri =   http://localhost/azure/signin
-    ckanext.azure_auth.auth_callback_path =  /azure/signin
+    # Callback path; the full URL should be whitelisted on the identity service
+    # By default it's /azure/signin; modify only if you have issues in whitelisting
+    # ckanext.azure_auth.auth_callback_path =  /azure/signin
+
+In case you have a custom function, you may need an access token, so you can add the scope for it:
+
+    ckanext.azure_auth.response_type = id_token token
+    ckanext.azure_auth.scope = openid https://sample.onmicrosoft.com/sample_uuid/access_as_user
+    ckanext.azure_auth.custom_user_func = ckanext.your_extension.your_module.your_function
 
 Development Environment:
 ------------------------
@@ -173,7 +169,7 @@ Activate and install requirements with the `pip` command:
 
 After authentication, tokens stored into
 
-    session[f'{ADFS_SESSION_PRREFIX}tokens']
+    session[f'{ADFS_SESSION_PREFIX}tokens']
     ----
     {
       'token_type': 'Bearer',
@@ -186,7 +182,7 @@ After authentication, tokens stored into
     }
 
 
-where `ADFS_SESSION_PRREFIX = 'adfs-'`
+where `ADFS_SESSION_PREFIX = 'adfs-'`
 
 
 

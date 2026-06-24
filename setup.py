@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name='ckanext-azure-auth',
-    version='0.0.1',
+    version='0.9.9',
     description='ADFS Authentication',
     long_description="""
     Integrates with ADFS Authentication
@@ -24,7 +24,8 @@ setup(
     ],
     entry_points="""
         [ckan.plugins]
-        # Add plugins here, e.g.
         azure_auth=ckanext.azure_auth.plugin:AzureAuthPlugin
+        azure_auth_adfs=ckanext.azure_auth.adfs.plugin:AzureAdfsPlugin
+        azure_auth_b2c=ckanext.azure_auth.b2c.plugin:AzureB2CPlugin
     """,
 )
