@@ -22,6 +22,7 @@ from ckanext.azure_auth.b2c.config import b2c_config
 from ckanext.azure_auth.constants import (
     ADFS_SESSION_PREFIX,
     ATTR_AUTH_CALLBACK_PATH,
+    ATTR_LOGIN_TITLE,
     ATTR_LOGIN_BUTTON,
     ATTR_LOGIN_LABEL,
     DEFAULT_CALLBACK_PATH,
@@ -48,8 +49,9 @@ def check_for_sysadmin():
 @azure_admin_blueprint.route("/ckan-admin/azure_auth", methods=["POST", "GET"])
 def azure_auth_config():
     configurable_keys = (
-        ATTR_LOGIN_LABEL,
+        ATTR_LOGIN_TITLE,
         ATTR_LOGIN_BUTTON,
+        ATTR_LOGIN_LABEL,
     )
 
     if request.method == "POST":

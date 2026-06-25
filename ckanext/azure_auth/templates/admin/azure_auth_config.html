@@ -1,7 +1,6 @@
-{% import 'macros/autoform.html' as autoform %}
-
 {% extends "admin/base.html" %}
 
+{% import 'macros/autoform.html' as autoform %}
 {% import 'macros/form.html' as form %}
 
 {% block primary_content_inner %}
@@ -11,17 +10,23 @@
   <form method='post' action="" id="admin-config-form" enctype="multipart/form-data">
     {% block admin_form %}
 
-    {{ form.input('ckanext.azure_auth.login_label',
-      id='field-ckanext.azure_auth.login_label',
-      label=_('Login label'),
-      value=data['ckanext.azure_auth.login_label'],
-      error=errors['ckanext.azure_auth.login_label']) }}
+    {{ form.input('ckanext.azure_auth.login_title',
+      id='field-ckanext.azure_auth.login_title',
+      label=_('Login title'),
+      value=data['ckanext.azure_auth.login_title'],
+      error=errors['ckanext.azure_auth.login_title']) }}
 
     {{ form.input('ckanext.azure_auth.login_button',
       id='field-ckanext.azure_auth.login_button',
       label=_('Login button'),
       value=data['ckanext.azure_auth.login_button'],
       error=errors['ckanext.azure_auth.login_button']) }}
+
+    {{ form.input('ckanext.azure_auth.login_label',
+      id='field-ckanext.azure_auth.login_label',
+      label=_('Login label'),
+      value=data['ckanext.azure_auth.login_label'],
+      error=errors['ckanext.azure_auth.login_label']) }}
 
       {% endblock %}
       <div class="form-actions">
@@ -34,7 +39,7 @@
   <div class="module module-narrow module-shallow">
     <h2 class="module-heading">
       <i class="fa fa-info-circle"></i>
-      {{ _('CKAN config options') }}
+      {{ _('Azure config options') }}
     </h2>
     <div class="module-content">
       {% block admin_form_help %}
@@ -42,10 +47,13 @@
         {% set home_url = h.url_for(controller='home', action='index') %}
         {% set docs_url = "http://docs.ckan.org/en/{0}/theming".format(g.ckan_doc_version) %}
         {% trans %}
-          <p><strong>Login label:</strong> The text appearing in the panel for the ADFS login.</p>
+          <p><strong>Login title:</strong> The text appearing as a title in the panel for the Azure login.</p>
         {% endtrans %}
         {% trans %}
-          <p><strong>Login button:</strong> The text appearing inside the ADFS login button.</p>
+          <p><strong>Login button:</strong> The text appearing inside the Azure login button.</p>
+        {% endtrans %}
+        {% trans %}
+          <p><strong>Login label:</strong> The text appearing as a description in the panel for the Azure login.</p>
         {% endtrans %}
     {% endblock %}
     </div>

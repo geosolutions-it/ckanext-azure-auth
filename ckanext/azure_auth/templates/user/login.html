@@ -12,14 +12,15 @@
       <div class="login-block adfs">
       <fieldset>
         <legend>
-          {{ h.adfs_get_attrib('ckanext.azure_auth.login_label') or _('Login with Microsoft Azure') }}</legend>
+          {{ h.adfs_get_attrib('ckanext.azure_auth.login_title') or _('Login with Microsoft Azure') }}</legend>
         <div class="control-group control-medium">
           {% if h.adfs_authentication_endpoint %}
           <a href="{{ h.adfs_authentication_endpoint }}" id="adfs-login-link" class="btn btn-primary btn-microsoft">
             <span class="fa-brands fa-microsoft"></span> {{ h.adfs_get_attrib('ckanext.azure_auth.login_button') or (g.site_title ~ ' ' ~ _('sign in')) }}
           </a>
           <p>
-            {{ _('For employees, click the button above to sign in with your organizational or guest account.') }}
+            {{ h.adfs_get_attrib('ckanext.azure_auth.login_label') or
+            _('For employees, click the button above to sign in with your organizational or guest account.') }}
           </p>
           {% else %}
             <p>
